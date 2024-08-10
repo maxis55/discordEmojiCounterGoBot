@@ -2,8 +2,10 @@ package main
 
 import (
 	"database/sql"
+	"discordEmojiCounterBot/bot"
 	"encoding/json"
 	"fmt"
+	"github.com/joho/godotenv"
 	"log"
 	"net/http"
 	"os"
@@ -15,7 +17,8 @@ import (
 )
 
 func connect() (*sql.DB, error) {
-	return sql.Open("postgres", "postgres://postgres:secret@db:5432/example?sslmode=disable")
+	//return sql.Open("postgres", "postgres://postgres:secret@db:5432/example?sslmode=disable")
+	return sql.Open("postgres", "postgres://postgres:secret@localhost:5432/example?sslmode=disable")
 }
 
 func blogHandler(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +43,7 @@ func blogHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(titles)
 }
 
-func main() {
+func main2() {
 	log.Print("Prepare db...")
 	log.Print("Updated file with logs")
 	log.Print("Updated file with logs again btw")
@@ -52,6 +55,20 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", blogHandler)
 	log.Fatal(http.ListenAndServe(":8000", handlers.LoggingHandler(os.Stdout, r)))
+}
+
+func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	bot.Token = os.Getenv("DISCORD_KEY")
+	db, _ := connect()
+	defer db.Close()
+	bot.Run(db)
+
+	log.Println("Shutting down")
 }
 
 func prepare() error {
