@@ -84,24 +84,8 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		discord.ChannelMessageSend(message.ChannelID, "Hello World😃")
 	case strings.Contains(message.Content, "%%bye"):
 		discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
-	case strings.Contains(message.Content, "%%test"):
-		discord.ChannelMessageSendReply(message.ChannelID, "Good Bye👋", message.Reference())
-	case strings.Contains(message.Content, "%%bye"):
-		discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
-	case strings.Contains(message.Content, "%%editTest"):
-
-		msg, err := discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
-		//if err != nil {
-		//	discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
-		//	return
-		//}
-
-		msg, err = discord.ChannelMessageEdit(msg.ChannelID, msg.ID, "New message content here", requestConfig)
-		if err != nil {
-			fmt.Println("err")
-			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
-			return
-		}
+	case strings.Contains(message.Content, "%%help"):
+		discord.ChannelMessageSend(message.ChannelID, "Nobody will help you")
 
 	case strings.Contains(message.Content, "%%saveEverythingAboutThisGuild"):
 		discord.ChannelMessageSend(message.ChannelID, "Ok")
@@ -132,7 +116,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		}
 		discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, "Done", requestConfig)
 
-	case strings.Contains(message.Content, "%%dance"):
+	case strings.Contains(message.Content, "%%danceHere"):
 		trackingMsg, _ := discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
 
 		channel, err := queryChannelById(dbv, message.ChannelID)
@@ -158,17 +142,26 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 			time.Sleep(time.Second * 2)
 		}
 		discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, "Done", requestConfig)
-	}
 
-	if message.Author.ID == "181180158441422848" {
-		err := ProcessOneMessage(MessageModel{Message: message.Message}, message.GuildID, dbv, true)
+	case strings.Contains(message.Content, "%%rankUsedEmojisInGuild"):
+		res, err := rankUsedEmojisInGuild(dbv, message.GuildID, 10)
 
 		if err != nil {
 			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+			return
 		}
 
-		return
+		discord.ChannelMessageSendReply(message.ChannelID, res, message.Reference())
 	}
+
+	err := ProcessOneMessage(MessageModel{Message: message.Message}, message.GuildID, dbv, true)
+
+	if err != nil {
+		discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+	}
+
+	return
+
 }
 
 func newReaction(discord *discordgo.Session, messageReaction *discordgo.MessageReactionAdd) {
