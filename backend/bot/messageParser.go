@@ -59,8 +59,8 @@ func queryChannelById(db *sql.DB, cid string) (*ChannelModel, error) {
 }
 
 func (model GuildModel) remember(db *sql.DB) error {
-	if _, err := db.Exec("INSERT INTO guilds (guild_id, name, system_channel_id, region, member_count, icon, joined_at, owner_id)"+
-		" VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (guild_id) DO NOTHING;",
+	if _, err := db.Exec(`INSERT INTO guilds (guild_id, name, system_channel_id, region, member_count, icon, joined_at, owner_id)
+									VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (guild_id) DO NOTHING;`,
 		model.Guild.ID, model.Guild.Name, model.Guild.SystemChannelID, model.Guild.Region, model.Guild.MemberCount, model.Guild.Icon, model.Guild.JoinedAt, model.Guild.OwnerID); err != nil {
 		return err
 	}

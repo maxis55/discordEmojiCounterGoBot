@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -43,6 +44,12 @@ func checkNilErr(e error) {
 		log.Fatal("Error message")
 	}
 }
+
+const pr = "%%"
+const rankUsedEmojisInGuild = pr + "rankUsedEmojisInGuild"
+const rankUsedEmojisInGuildAsc = pr + "rankUsedEmojisInGuild"
+const rankAvailableUsedEmojisInGuild = pr + "rankAvailableUsedEmojisInGuild"
+const rankAvailableUsedEmojisInGuildAsc = pr + "rankAvailableUsedEmojisInGuildAsc"
 
 func Run(dbc *sql.DB) {
 
@@ -143,8 +150,15 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		}
 		discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, "Done", requestConfig)
 
-	case strings.Contains(message.Content, "%%rankUsedEmojisInGuild"):
-		res, err := rankUsedEmojisInGuild(dbv, message.GuildID, 10)
+	case strings.Contains(message.Content, rankUsedEmojisInGuild):
+		limit, err := strconv.Atoi(strings.Replace(message.Content, rankUsedEmojisInGuild, "", 1))
+
+		if err != nil {
+			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+			return
+		}
+
+		res, err := getRankedUsedEmojisInGuild(dbv, message.GuildID, limit, true)
 
 		if err != nil {
 			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
@@ -152,6 +166,18 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		}
 
 		discord.ChannelMessageSendReply(message.ChannelID, res, message.Reference())
+
+	case strings.Contains(message.Content, rankAvailableUsedEmojisInGuild):
+
+		res, err := getRankedAvailableUsedEmojisInGuild(dbv, message.GuildID, 10, true)
+
+		if err != nil {
+			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+			return
+		}
+
+		discord.ChannelMessageSendReply(message.ChannelID, res, message.Reference())
+
 	}
 
 	err := ProcessOneMessage(MessageModel{Message: message.Message}, message.GuildID, dbv, true)
