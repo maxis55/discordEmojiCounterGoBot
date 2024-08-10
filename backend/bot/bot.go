@@ -9,12 +9,34 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 var Token string
 var dbv *sql.DB
 
 var dancers = [...]string{"💃", "💃🏻", "💃🏼", "💃🏽", "💃🏾", "💃🏿", "🕺🏿", "🕺🏾", "🕺🏽", "🕺🏼", "🕺🏻", "🕺"}
+
+type WaitGroupCount struct {
+	sync.WaitGroup
+	count int64
+}
+
+func (wg *WaitGroupCount) Add(delta int) {
+	atomic.AddInt64(&wg.count, int64(delta))
+	wg.WaitGroup.Add(delta)
+}
+
+func (wg *WaitGroupCount) Done() {
+	atomic.AddInt64(&wg.count, -1)
+	wg.WaitGroup.Done()
+}
+
+func (wg *WaitGroupCount) GetCount() int {
+	return int(atomic.LoadInt64(&wg.count))
+}
 
 func checkNilErr(e error) {
 	if e != nil {
@@ -66,24 +88,28 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		discord.ChannelMessageSendReply(message.ChannelID, "Good Bye👋", message.Reference())
 	case strings.Contains(message.Content, "%%bye"):
 		discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
-	case strings.Contains(message.Content, "%%saveEverythingAboutThisGuild"):
-		discord.ChannelMessageSend(message.ChannelID, "Ok")
-		saveGuildInfo(discord, message.GuildID, dbv)
-		discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())
-	case strings.Contains(message.Content, "%%channelTest"):
-		chId := "12123123"
+	case strings.Contains(message.Content, "%%editTest"):
 
-		channel := &discordgo.Channel{Name: "test", ID: chId}
-		_, err := discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
+		msg, err := discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
+		//if err != nil {
+		//	discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+		//	return
+		//}
+
+		msg, err = discord.ChannelMessageEdit(msg.ChannelID, msg.ID, "New message content here", requestConfig)
 		if err != nil {
+			fmt.Println("err")
 			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
 			return
 		}
 
-		getAndSaveAllMessages(discord, message.Message, message.GuildID, dbv, make(map[string]AuthorModel), message.Reference(), channel)
+	case strings.Contains(message.Content, "%%saveEverythingAboutThisGuild"):
+		discord.ChannelMessageSend(message.ChannelID, "Ok")
+		saveGuildInfo(discord, message.GuildID, dbv)
+		discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())
 
 	case strings.Contains(message.Content, "%%danceInEveryChannel"):
-		discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
+		trackingMsg, _ := discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
 
 		channels, err := queryAllGuildChannels(dbv, message.GuildID)
 		if err != nil {
@@ -91,12 +117,23 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 			return
 		}
 
+		wg := WaitGroupCount{}
+
 		for _, channel := range channels {
-			go getAndSaveAllMessages(discord, message.Message, message.GuildID, dbv, make(map[string]AuthorModel), message.Reference(), channel.Channel)
+			wg.Add(1)
+			go func(ch ChannelModel) {
+				defer wg.Done()
+				getAndSaveAllMessages(discord, message.Message, message.GuildID, dbv, make(map[string]AuthorModel), message.Reference(), ch.Channel)
+			}(channel)
 		}
+		for wg.GetCount() > 0 {
+			trackingMsg, err = discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, fmt.Sprintf("Working on %d channels", wg.GetCount()), requestConfig)
+			time.Sleep(time.Second * 2)
+		}
+		discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, "Done", requestConfig)
 
 	case strings.Contains(message.Content, "%%dance"):
-		discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
+		trackingMsg, _ := discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
 
 		channel, err := queryChannelById(dbv, message.ChannelID)
 
@@ -109,9 +146,18 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 			discord.ChannelMessageSendReply(message.ChannelID, "Cant find the channel in the DB. Save this guild first maybe", message.Reference(), requestConfig)
 			return
 		}
+		wg := WaitGroupCount{}
+		wg.Add(1)
+		go func(ch ChannelModel) {
+			defer wg.Done()
+			getAndSaveAllMessages(discord, message.Message, message.GuildID, dbv, make(map[string]AuthorModel), message.Reference(), ch.Channel)
+		}(*channel)
 
-		go getAndSaveAllMessages(discord, message.Message, message.GuildID, dbv, make(map[string]AuthorModel), message.Reference(), channel.Channel)
-
+		for wg.GetCount() > 0 {
+			trackingMsg, err = discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, fmt.Sprintf("Working on %d channels", wg.GetCount()), requestConfig)
+			time.Sleep(time.Second * 2)
+		}
+		discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, "Done", requestConfig)
 	}
 
 	if message.Author.ID == "181180158441422848" {
@@ -131,9 +177,9 @@ func newReaction(discord *discordgo.Session, messageReaction *discordgo.MessageR
 	//this is achived by looking into the message author id
 	//if message.author.id is same as bot.author.id then just return
 	//*/
-	//if message.UserID.ID == discord.State.User.ID || message.Author.Bot {
-	//	return
-	//}
+	if messageReaction.UserID == discord.State.User.ID {
+		return
+	}
 
 	fmt.Println(fmt.Sprintf("%+v", messageReaction.Emoji))
 

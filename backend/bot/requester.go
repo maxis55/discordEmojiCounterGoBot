@@ -118,7 +118,6 @@ func getAndSaveAllMessages(discord *discordgo.Session, bMessage *discordgo.Messa
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-
 		return
 	}
 
