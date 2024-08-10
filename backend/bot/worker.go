@@ -2,12 +2,11 @@ package bot
 
 import (
 	"database/sql"
-	"fmt"
 )
 
-func ProcessOneMessage(message MessageModel, gid string, db *sql.DB, saveAuthor bool) {
+func ProcessOneMessage(message MessageModel, gid string, db *sql.DB, saveAuthor bool) error {
 	if message.Message.Author.Bot {
-		return
+		return nil
 	}
 
 	ejs := getEmojisFromMessage(message)
@@ -18,22 +17,27 @@ func ProcessOneMessage(message MessageModel, gid string, db *sql.DB, saveAuthor 
 	//save to DB
 	saveEmojis(ejs, db)
 
-	//createEmojiCounts
-	err := message.remember(gid, db)
+	err := cleanInfoAboutMessage(message.Message.ID, db)
 	if err != nil {
-		fmt.Println(err.Error())
+		return err
+	}
+
+	err = message.remember(gid, db)
+	if err != nil {
+		return err
 	}
 
 	err = message.saveEmojiUsages(db, ejs, gid)
 	if err != nil {
-		fmt.Println(err.Error())
+		return err
 	}
 
 	if saveAuthor {
 		err = AuthorModel{Author: message.Message.Author}.remember(db)
 		if err != nil {
-			fmt.Println(err.Error())
+			return err
 		}
 	}
 
+	return nil
 }

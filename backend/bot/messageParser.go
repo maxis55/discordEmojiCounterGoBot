@@ -106,3 +106,13 @@ func (model AuthorModel) remember(db *sql.DB) error {
 	}
 	return nil
 }
+
+func cleanInfoAboutMessage(mid string, db *sql.DB) error {
+	if _, err := db.Exec("DELETE FROM messages WHERE message_id=$1;", mid); err != nil {
+		return err
+	}
+	if _, err := db.Exec("DELETE FROM emoji_used where message_id=$1;", mid); err != nil {
+		return err
+	}
+	return nil
+}

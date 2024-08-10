@@ -95,10 +95,17 @@ func getAndSaveAllMessages(discord *discordgo.Session, bMessage *discordgo.Messa
 			mm.Reactions = reactModels
 		}
 
-		ProcessOneMessage(mm, gid, db, false)
+		err = ProcessOneMessage(mm, gid, db, false)
+		if err != nil {
+			errMsg := err.Error()
+			_, err = discord.ChannelMessageSendReply(reference.ChannelID, "💀 Reason: "+errMsg+" channel "+channel.Name, reference, requestConfig)
+
+			fmt.Println(errMsg)
+			return
+		}
 	}
 
-	if len(authors) > 10 {
+	if len(authors) > 20 {
 		saveAuthors(authors, db)
 		clear(authors)
 	}

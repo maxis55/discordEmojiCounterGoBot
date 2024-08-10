@@ -69,16 +69,25 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	case strings.Contains(message.Content, "%%saveEverythingAboutThisGuild"):
 		discord.ChannelMessageSend(message.ChannelID, "Ok")
 		saveGuildInfo(discord, message.GuildID, dbv)
-
+		discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())
 	case strings.Contains(message.Content, "%%channelTest"):
-		discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
+		chId := "12123123"
+
+		channel := &discordgo.Channel{Name: "test", ID: chId}
+		_, err := discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
+		if err != nil {
+			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+			return
+		}
+
+		getAndSaveAllMessages(discord, message.Message, message.GuildID, dbv, make(map[string]AuthorModel), message.Reference(), channel)
 
 	case strings.Contains(message.Content, "%%danceInEveryChannel"):
 		discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
 
 		channels, err := queryAllGuildChannels(dbv, message.GuildID)
 		if err != nil {
-			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference())
+			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
 			return
 		}
 
@@ -92,12 +101,12 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		channel, err := queryChannelById(dbv, message.ChannelID)
 
 		if err != nil {
-			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference())
+			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
 			return
 		}
 
 		if channel == nil {
-			discord.ChannelMessageSendReply(message.ChannelID, "Cant find the channel in the DB. Save this guild first maybe", message.Reference())
+			discord.ChannelMessageSendReply(message.ChannelID, "Cant find the channel in the DB. Save this guild first maybe", message.Reference(), requestConfig)
 			return
 		}
 
@@ -106,7 +115,13 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	}
 
 	if message.Author.ID == "181180158441422848" {
-		ProcessOneMessage(MessageModel{Message: message.Message}, message.GuildID, dbv, true)
+		err := ProcessOneMessage(MessageModel{Message: message.Message}, message.GuildID, dbv, true)
+
+		if err != nil {
+			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+		}
+
+		return
 	}
 }
 
