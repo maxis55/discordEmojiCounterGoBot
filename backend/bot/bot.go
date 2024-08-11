@@ -2,13 +2,13 @@ package bot
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"log"
 	"math/rand"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -151,14 +151,13 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, "Done", requestConfig)
 
 	case strings.Contains(message.Content, rankUsedEmojisInGuild):
-		limit, err := strconv.Atoi(strings.Replace(message.Content, rankUsedEmojisInGuild, "", 1))
+		s := ExtractSettings(message.Content)
 
-		if err != nil {
-			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
-			return
-		}
+		js, _ := json.Marshal(s)
 
-		res, err := getRankedUsedEmojisInGuild(dbv, message.GuildID, limit, true)
+		discord.ChannelMessageSend(message.ChannelID, fmt.Sprintf("Rank with following settings: %s", js))
+
+		res, err := getRankedUsedEmojisInGuild(dbv, message.GuildID, s)
 
 		if err != nil {
 			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)

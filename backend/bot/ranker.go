@@ -11,23 +11,80 @@ type EmojiRank struct {
 	Emoji discordgo.Emoji
 }
 
-func getRankedUsedEmojisInGuild(db *sql.DB, gid string, limit int, desc bool) (string, error) {
+func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings) (string, error) {
+
+	params := []interface{}{
+		gid,
+	}
+	paramsC := 1
 
 	query := `select e.emoji_id, e.name, e.animated, COUNT(eu.id) as emoji_count
-									from emoji_used eu join emojis e on eu.emoji_id = e.emoji_id
-									where eu.guild_id = $1
-									group by e.emoji_id`
+									from emoji_used eu join emojis e on eu.emoji_id = e.emoji_id`
 
-	order := "asc"
-
-	if desc {
-		order = " asc"
+	if (settings.FromDate != nil && *settings.FromDate != "") || (settings.ToDate != nil && *settings.ToDate != "") {
+		// lets assume reactions were approximately at the time when the message was sent
+		// should be optimized by saving timestamp to the emoji_used table since discord doesn't provide it
+		query += " join messages m on eu.message_id = m.message_id "
 	}
 
-	query += fmt.Sprintf(" order by emoji_count %s", order)
-	query += fmt.Sprintf(" LIMIT %d", limit)
+	query += " where eu.guild_id = $1 "
 
-	rows, err := db.Query(query, gid)
+	if settings.BelongToTheGuild != nil && *settings.BelongToTheGuild {
+		query += " and e.guild_id = $1"
+	}
+
+	if settings.ChannelID != nil && *settings.ChannelID != "" {
+		paramsC++
+		query += fmt.Sprintf(" and eu.channel_id = $%d", paramsC)
+		params = append(params, *settings.ChannelID)
+
+	}
+
+	if settings.AuthorID != nil && *settings.AuthorID != "" {
+		paramsC++
+		query += fmt.Sprintf(" and eu.author_id = $%d", paramsC)
+		params = append(params, *settings.AuthorID)
+	}
+
+	if settings.WithoutReactions != nil && *settings.WithoutReactions {
+		query += " and eu.is_reaction != true"
+	}
+
+	if settings.WithoutMessageText != nil && *settings.WithoutMessageText {
+		query += " and eu.is_reaction != false"
+	}
+
+	if settings.WithoutMessageText != nil && *settings.WithoutMessageText {
+		query += " and eu.is_reaction != false"
+	}
+
+	if settings.FromDate != nil && *settings.FromDate != "" {
+		query += fmt.Sprintf(" and m.timestamp >= $%d", paramsC)
+		params = append(params, *settings.FromDate)
+	}
+
+	if settings.ToDate != nil && *settings.ToDate != "" {
+		query += fmt.Sprintf(" and m.timestamp <= $%d", paramsC)
+		params = append(params, *settings.ToDate)
+	}
+
+	query += " group by e.emoji_id"
+
+	if settings.Desc != nil {
+		order := "desc"
+
+		if !*settings.Desc {
+			order = "asc"
+		}
+
+		query += fmt.Sprintf(" order by emoji_count %s", order)
+	}
+
+	if settings.Limit != nil && *settings.Limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", *settings.Limit)
+	}
+
+	rows, err := db.Query(query, params...)
 	if err != nil {
 		return "", err
 	}
@@ -53,6 +110,10 @@ func getRankedUsedEmojisInGuild(db *sql.DB, gid string, limit int, desc bool) (s
 
 	for i, model := range models {
 		result += fmt.Sprintf("%d. %s - %d \n", i+1, model.Emoji.MessageFormat(), model.Count)
+	}
+
+	if result == "" {
+		result = "Empty set."
 	}
 
 	return result, nil
