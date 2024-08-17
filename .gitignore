@@ -1,3 +1,4 @@
 /.idea
 /backend/.env
+/db/password.txt
 .env
