@@ -10,7 +10,7 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:12
+    image: postgres:16-alpine
     restart: always
     user: postgres
     secrets:
@@ -18,30 +18,30 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=example
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=emoji_tracker
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
     expose:
-      - 5432
+      - 5433
     ports:
-      - 5432:5432
+      - 5433:5432
     healthcheck:
-      test: [ "CMD", "pg_isready" ]
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  proxy:
-    image: nginx
-    volumes:
-      - type: bind
-        source: ./proxy/nginx.conf
-        target: /etc/nginx/conf.d/default.conf
-        read_only: true
-    ports:
-      - 80:80
-    depends_on:
-      - backend
+#  proxy:
+#    image: nginx
+#    volumes:
+#      - type: bind
+#        source: ./proxy/nginx.conf
+#        target: /etc/nginx/conf.d/default.conf
+#        read_only: true
+#    ports:
+#      - 80:80
+#    depends_on:
+#      - backend
 
 volumes:
   db-data:
