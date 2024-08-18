@@ -26,6 +26,7 @@ create table if not exists emoji_used
 (
     id          bigserial primary key,
     message_id  varchar(255) null,
+    m_author_id varchar(255) null,
     guild_id    varchar(255) null,
     channel_id  varchar(255) null,
     author_id   varchar(255) null,

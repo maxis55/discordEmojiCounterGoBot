@@ -39,15 +39,17 @@ func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings
 		params = append(params, *settings.AuthorID)
 	}
 
-	if settings.WithoutReactions != nil && *settings.WithoutReactions {
+	if settings.MessageAuthorId != nil && *settings.MessageAuthorId != "" {
+		paramsC++
+		query += fmt.Sprintf(" and eu.m_author_id = $%d", paramsC)
+		params = append(params, *settings.MessageAuthorId)
+	}
+
+	if settings.IgnoreReactions != nil && *settings.IgnoreReactions {
 		query += " and eu.is_reaction != true"
 	}
 
-	if settings.WithoutMessageText != nil && *settings.WithoutMessageText {
-		query += " and eu.is_reaction != false"
-	}
-
-	if settings.WithoutMessageText != nil && *settings.WithoutMessageText {
+	if settings.IgnoreMessageText != nil && *settings.IgnoreMessageText {
 		query += " and eu.is_reaction != false"
 	}
 

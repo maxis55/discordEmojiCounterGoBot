@@ -6,15 +6,16 @@ import (
 )
 
 type RankingSettings struct {
-	AuthorID           *string `json:"author,omitempty"`
-	ChannelID          *string `json:"channel,omitempty"`
-	WithoutReactions   *bool   `json:"withoutReactions,omitempty"`
-	WithoutMessageText *bool   `json:"withoutMessageText,omitempty"`
-	BelongToTheGuild   *bool   `json:"belongToTheGuild,omitempty"`
-	FromDate           *string `json:"fromDate,omitempty"`
-	ToDate             *string `json:"toDate,omitempty"`
-	Desc               *bool   `json:"desc,omitempty"`
-	Limit              *int    `json:"limit,omitempty"`
+	AuthorID          *string `json:"author,omitempty"`
+	MessageAuthorId   *string `json:"messageAuthor,omitempty"`
+	ChannelID         *string `json:"channel,omitempty"`
+	IgnoreReactions   *bool   `json:"withoutReactions,omitempty"`
+	IgnoreMessageText *bool   `json:"withoutMessageText,omitempty"`
+	BelongToTheGuild  *bool   `json:"belongToTheGuild,omitempty"`
+	FromDate          *string `json:"fromDate,omitempty"`
+	ToDate            *string `json:"toDate,omitempty"`
+	Desc              *bool   `json:"desc,omitempty"`
+	Limit             *int    `json:"limit,omitempty"`
 }
 
 // ExtractSettings takes a string of parameters and returns a RankingSettings struct
@@ -23,15 +24,16 @@ func ExtractSettings(text string) RankingSettings {
 
 	// Define regex patterns for each parameter
 	patterns := map[string]*regexp.Regexp{
-		"author":             regexp.MustCompile(`author=(\d+)`),
-		"withoutReactions":   regexp.MustCompile(`withoutReactions=(true|false)`),
-		"withoutMessageText": regexp.MustCompile(`withoutMessageText=(true|false)`),
-		"belongToTheGuild":   regexp.MustCompile(`belongToTheGuild=(true|false)`),
-		"fromDate":           regexp.MustCompile(`fromDate=(\d{4}-\d{2}-\d{2})`),
-		"toDate":             regexp.MustCompile(`toDate=(\d{4}-\d{2}-\d{2})`),
-		"desc":               regexp.MustCompile(`desc=(true|false)`),
-		"limit":              regexp.MustCompile(`limit=(\d+)`),
-		"channel":            regexp.MustCompile(`channel=(\d+)`),
+		"author":            regexp.MustCompile(`author=(\d+)`),
+		"messageAuthor":     regexp.MustCompile(`messageAuthor=(\d+)`),
+		"ignoreReactions":   regexp.MustCompile(`ignoreReactions=(true|false)`),
+		"ignoreMessageText": regexp.MustCompile(`ignoreMessageText=(true|false)`),
+		"belongToTheGuild":  regexp.MustCompile(`belongToTheGuild=(true|false)`),
+		"fromDate":          regexp.MustCompile(`fromDate=(\d{4}-\d{2}-\d{2})`),
+		"toDate":            regexp.MustCompile(`toDate=(\d{4}-\d{2}-\d{2})`),
+		"desc":              regexp.MustCompile(`desc=(true|false)`),
+		"limit":             regexp.MustCompile(`limit=(\d+)`),
+		"channel":           regexp.MustCompile(`channel=(\d+)`),
 	}
 
 	// Apply each regex pattern to the text and assign to the struct
@@ -40,14 +42,16 @@ func ExtractSettings(text string) RankingSettings {
 			switch key {
 			case "author":
 				settings.AuthorID = &match[1]
+			case "messageAuthor":
+				settings.MessageAuthorId = &match[1]
 			case "channel":
 				settings.ChannelID = &match[1]
-			case "withoutReactions":
+			case "ignoreReactions":
 				b := match[1] == "true"
-				settings.WithoutReactions = &b
-			case "withoutMessageText":
+				settings.IgnoreReactions = &b
+			case "ignoreMessageText":
 				b := match[1] == "true"
-				settings.WithoutMessageText = &b
+				settings.IgnoreMessageText = &b
 			case "belongToTheGuild":
 				b := match[1] == "true"
 				settings.BelongToTheGuild = &b

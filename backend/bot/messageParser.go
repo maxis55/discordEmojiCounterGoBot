@@ -100,9 +100,9 @@ func (model MessageModel) remember(gid string, db *sql.DB) error {
 func (model MessageModel) saveEmojiUsages(db *sql.DB, emojiModels []EmojiModel, gid string) error {
 
 	for _, emj := range emojiModels {
-		if _, err := db.Exec(`INSERT INTO emoji_used (message_id, guild_id, channel_id,  author_id, emoji_id, is_reaction, timestamp)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7);`,
-			model.Message.ID, gid, model.Message.ChannelID, emj.AuthorID, emj.Emoji.ID, emj.IsReaction, emj.Timestamp); err != nil {
+		if _, err := db.Exec(`INSERT INTO emoji_used (message_id, guild_id, channel_id,  author_id, emoji_id, is_reaction, timestamp, m_author_id)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+			model.Message.ID, gid, model.Message.ChannelID, emj.AuthorID, emj.Emoji.ID, emj.IsReaction, emj.Timestamp, emj.MessageAuthorId); err != nil {
 			return err
 		}
 	}

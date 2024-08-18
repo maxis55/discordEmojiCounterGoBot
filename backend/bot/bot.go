@@ -64,25 +64,27 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 
 	// respond to user message if it contains `!help` or `!bye`
 	switch {
-	case strings.Contains(message.Content, "%%hello"):
+	case strings.HasPrefix(message.Content, "%%hello"):
 		discord.ChannelMessageSend(message.ChannelID, "Hello World😃")
-	case strings.Contains(message.Content, "%%bye"):
+	case strings.HasPrefix(message.Content, "%%bye"):
 		discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
-	case strings.Contains(message.Content, "%%help"):
-		discord.ChannelMessageSend(message.ChannelID, "Nobody will help you")
 
-	case strings.Contains(message.Content, "%%saveEverythingAboutThisGuild"):
+	case strings.HasPrefix(message.Content, "%%saveEverythingAboutThisGuild"):
 		discord.ChannelMessageSend(message.ChannelID, "Ok")
 		saveGuildInfo(discord, message.GuildID, dbv)
 		discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())
 
-	case strings.Contains(message.Content, "%%danceInEveryChannel"):
+	case strings.HasPrefix(message.Content, "%%danceInEveryChannel"):
 		danceInEveryChannel(discord, message)
 
-	case strings.Contains(message.Content, "%%danceHere"):
+	case strings.HasPrefix(message.Content, "%%danceHere"):
 		danceHere(discord, message)
 
-	case strings.Contains(message.Content, rankUsedEmojisInGuild):
+	case strings.HasPrefix(message.Content, "%%helpMeRankEmojis"):
+		discord.ChannelMessageSend(message.ChannelID, "This is an example, figure it out: %%rankUsedEmojisInGuild author=123 channel=123321 ignoreReactions=true belongToTheGuild=false ignoreMessageText=false fromDate=2022-01-01 toDate=2024-01-01 limit=10")
+	case strings.HasPrefix(message.Content, "%%helpMeRankReactions"):
+		discord.ChannelMessageSend(message.ChannelID, "This is a special case messageAuthor only works like this(dates are optional): %%rankUsedEmojisInGuild messageAuthor=123 ignoreMessageText=true fromDate=2022-01-01 toDate=2024-01-01 limit=10")
+	case strings.HasPrefix(message.Content, rankUsedEmojisInGuild):
 		s := ExtractSettings(message.Content)
 
 		js, _ := json.Marshal(s)
@@ -97,7 +99,6 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		}
 
 		discord.ChannelMessageSendReply(message.ChannelID, res, message.Reference())
-
 	}
 
 	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, dbv, true)
