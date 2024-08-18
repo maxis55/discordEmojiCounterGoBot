@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"math/rand"
+	"time"
 )
 
 const messagesLimit = 100
@@ -112,5 +114,62 @@ func saveAuthors(authors map[string]AuthorModel, db *sql.DB) {
 			fmt.Println(err.Error())
 		}
 	}
+}
 
+func danceInEveryChannel(discord *discordgo.Session, message *discordgo.MessageCreate) {
+	trackingMsg, _ := discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
+
+	channels, err := queryAllGuildChannels(dbv, message.GuildID)
+	if err != nil {
+		discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+		return
+	}
+
+	wg := WaitGroupCount{}
+
+	for _, channel := range channels {
+		wg.Add(1)
+		go func(ch ChannelModel) {
+			defer wg.Done()
+			getAndSaveAllMessages(discord, message.Message, message.GuildID, dbv, make(map[string]AuthorModel), message.Reference(), ch.Channel)
+		}(channel)
+	}
+	for wg.GetCount() > 0 {
+		trackingMsg, err = discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, fmt.Sprintf("Working on %d channels", wg.GetCount()), requestConfig)
+		time.Sleep(time.Second * 2)
+	}
+	discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, "Done", requestConfig)
+}
+
+func danceHere(discord *discordgo.Session, message *discordgo.MessageCreate) {
+	trackingMsg, err := discord.ChannelMessageSend(message.ChannelID, "Ok"+dancers[rand.Intn(len(dancers))])
+
+	if err != nil {
+		discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+		return
+	}
+
+	channel, err := queryChannelById(dbv, message.ChannelID)
+
+	if err != nil {
+		discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+		return
+	}
+
+	if channel == nil {
+		discord.ChannelMessageSendReply(message.ChannelID, "Cant find the channel in the DB. Save this guild first maybe", message.Reference(), requestConfig)
+		return
+	}
+	wg := WaitGroupCount{}
+	wg.Add(1)
+	go func(ch ChannelModel) {
+		defer wg.Done()
+		getAndSaveAllMessages(discord, message.Message, message.GuildID, dbv, make(map[string]AuthorModel), message.Reference(), ch.Channel)
+	}(*channel)
+
+	for wg.GetCount() > 0 {
+		trackingMsg, err = discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, fmt.Sprintf("Working on %d channels", wg.GetCount()), requestConfig)
+		time.Sleep(time.Second * 2)
+	}
+	discord.ChannelMessageEdit(trackingMsg.ChannelID, trackingMsg.ID, "Done", requestConfig)
 }
