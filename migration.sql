@@ -30,7 +30,8 @@ create table if not exists emoji_used
     channel_id  varchar(255) null,
     author_id   varchar(255) null,
     emoji_id    varchar(255) null,
-    is_reaction bool         null
+    is_reaction bool         null,
+    timestamp   timestamp    null
 );
 
 create table if not exists authors

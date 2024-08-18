@@ -8,12 +8,15 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"regexp"
 	"slices"
+	"time"
 )
 
+// EmojiModel we can approximate that emote was used when message was created
 type EmojiModel struct {
 	Emoji      discordgo.Emoji
 	AuthorID   *string
 	GuildID    *string
+	Timestamp  time.Time
 	IsReaction bool
 }
 
@@ -42,7 +45,8 @@ func getDefaultEmojisFromString(m *discordgo.Message) []EmojiModel {
 				Name:     match[0],
 				Animated: false,
 			},
-			AuthorID: &m.Author.ID,
+			Timestamp: m.Timestamp,
+			AuthorID:  &m.Author.ID,
 		})
 	}
 	return res
@@ -60,7 +64,8 @@ func getDiscordEmojisFromString(m *discordgo.Message) []EmojiModel {
 				Name:     match[2],
 				Animated: match[1] == "a",
 			},
-			AuthorID: &m.Author.ID,
+			Timestamp: m.Timestamp,
+			AuthorID:  &m.Author.ID,
 		})
 
 	}
@@ -73,31 +78,7 @@ func getMD5Hash(text string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func getReactionsFromMessage(message *discordgo.Message) []EmojiModel {
-
-	var res []EmojiModel
-	for _, reaction := range message.Reactions {
-		for i := 0; i < reaction.Count; i++ {
-			eId := reaction.Emoji.ID
-
-			if eId == "" {
-				eId = getMD5Hash(reaction.Emoji.Name)
-			}
-
-			res = append(res, EmojiModel{
-				Emoji: discordgo.Emoji{
-					ID:       eId,
-					Name:     reaction.Emoji.Name,
-					Animated: reaction.Emoji.Animated,
-				},
-				IsReaction: true,
-			})
-		}
-	}
-	return res
-}
-
-func getReactionsAsModels(users []*discordgo.User, emoji *discordgo.Emoji) []EmojiModel {
+func getReactionsAsModels(users []*discordgo.User, emoji *discordgo.Emoji, message MessageModel) []EmojiModel {
 
 	var res []EmojiModel
 
@@ -114,6 +95,7 @@ func getReactionsAsModels(users []*discordgo.User, emoji *discordgo.Emoji) []Emo
 				Name:     emoji.Name,
 				Animated: emoji.Animated,
 			},
+			Timestamp:  message.Message.Timestamp,
 			IsReaction: true,
 			AuthorID:   &user.ID,
 		})

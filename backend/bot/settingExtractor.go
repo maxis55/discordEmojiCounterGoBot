@@ -27,7 +27,7 @@ func ExtractSettings(text string) RankingSettings {
 		"withoutReactions":   regexp.MustCompile(`withoutReactions=(true|false)`),
 		"withoutMessageText": regexp.MustCompile(`withoutMessageText=(true|false)`),
 		"belongToTheGuild":   regexp.MustCompile(`belongToTheGuild=(true|false)`),
-		"fromDate":           regexp.MustCompile(`fromDate=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})`),
+		"fromDate":           regexp.MustCompile(`fromDate=(\d{4}-\d{2}-\d{2})`),
 		"toDate":             regexp.MustCompile(`toDate=(\d{4}-\d{2}-\d{2})`),
 		"desc":               regexp.MustCompile(`desc=(true|false)`),
 		"limit":              regexp.MustCompile(`limit=(\d+)`),

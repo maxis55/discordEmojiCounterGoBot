@@ -9,33 +9,12 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
-	"sync/atomic"
 )
 
 var Token string
 var dbv *sql.DB
 
 var dancers = [...]string{"💃", "💃🏻", "💃🏼", "💃🏽", "💃🏾", "💃🏿", "🕺🏿", "🕺🏾", "🕺🏽", "🕺🏼", "🕺🏻", "🕺"}
-
-type WaitGroupCount struct {
-	sync.WaitGroup
-	count int64
-}
-
-func (wg *WaitGroupCount) Add(delta int) {
-	atomic.AddInt64(&wg.count, int64(delta))
-	wg.WaitGroup.Add(delta)
-}
-
-func (wg *WaitGroupCount) Done() {
-	atomic.AddInt64(&wg.count, -1)
-	wg.WaitGroup.Done()
-}
-
-func (wg *WaitGroupCount) GetCount() int {
-	return int(atomic.LoadInt64(&wg.count))
-}
 
 func checkNilErr(e error) {
 	if e != nil {
@@ -123,7 +102,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 
 	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, dbv, true)
 
-	if err != nil && message.Author.ID == "181180158441422848" {
+	if err != nil {
 		discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
 	}
 

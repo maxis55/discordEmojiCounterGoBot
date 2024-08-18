@@ -61,7 +61,7 @@ func populateReactionEmojis(discord *discordgo.Session, message MessageModel) ([
 				return nil, err
 			}
 
-			reactModels = slices.Concat(reactModels, getReactionsAsModels(users, reaction.Emoji))
+			reactModels = slices.Concat(reactModels, getReactionsAsModels(users, reaction.Emoji, message))
 		}
 		return reactModels, nil
 	}

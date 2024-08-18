@@ -19,15 +19,8 @@ func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings
 	paramsC := 1
 
 	query := `select e.emoji_id, e.name, e.animated, COUNT(eu.id) as emoji_count
-									from emoji_used eu join emojis e on eu.emoji_id = e.emoji_id`
-
-	if (settings.FromDate != nil && *settings.FromDate != "") || (settings.ToDate != nil && *settings.ToDate != "") {
-		// lets assume reactions were approximately at the time when the message was sent
-		// should be optimized by saving timestamp to the emoji_used table since discord doesn't provide it
-		query += " join messages m on eu.message_id = m.message_id "
-	}
-
-	query += " where eu.guild_id = $1 "
+									from emoji_used eu join emojis e on eu.emoji_id = e.emoji_id
+									where eu.guild_id = $1`
 
 	if settings.BelongToTheGuild != nil && *settings.BelongToTheGuild {
 		query += " and e.guild_id = $1"
@@ -59,12 +52,14 @@ func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings
 	}
 
 	if settings.FromDate != nil && *settings.FromDate != "" {
-		query += fmt.Sprintf(" and m.timestamp >= $%d", paramsC)
+		paramsC++
+		query += fmt.Sprintf(" and eu.timestamp >= $%d::timestamp", paramsC)
 		params = append(params, *settings.FromDate)
 	}
 
 	if settings.ToDate != nil && *settings.ToDate != "" {
-		query += fmt.Sprintf(" and m.timestamp <= $%d", paramsC)
+		paramsC++
+		query += fmt.Sprintf(" and eu.timestamp <= $%d::timestamp", paramsC)
 		params = append(params, *settings.ToDate)
 	}
 
@@ -114,53 +109,6 @@ func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings
 
 	if result == "" {
 		result = "Empty set."
-	}
-
-	return result, nil
-}
-
-func getRankedAvailableUsedEmojisInGuild(db *sql.DB, gid string, limit int, desc bool) (string, error) {
-
-	query := `select e.emoji_id, e.name, e.animated, COUNT(eu.id) as emoji_count
-									from emoji_used eu join emojis e on eu.emoji_id = e.emoji_id
-									where eu.guild_id = $1 and e.guild_id = $1
-									group by e.emoji_id`
-	order := "asc"
-
-	if desc {
-		order = " asc"
-	}
-
-	query += fmt.Sprintf(" order by emoji_count %s", order)
-	query += fmt.Sprintf(" LIMIT %d", limit)
-
-	rows, err := db.Query(query, gid)
-
-	if err != nil {
-		return "", err
-	}
-
-	var models []EmojiRank
-
-	for rows.Next() {
-		model := EmojiRank{Emoji: discordgo.Emoji{}}
-		err = rows.Scan(&model.Emoji.ID, &model.Emoji.Name, &model.Emoji.Animated, &model.Count)
-
-		if emojiRegex.MatchString(model.Emoji.Name) {
-			model.Emoji.ID = ""
-		}
-
-		if err != nil {
-			return "", err
-		}
-
-		models = append(models, model)
-	}
-
-	var result string
-
-	for i, model := range models {
-		result += fmt.Sprintf("%d. %s - %d \n", i+1, model.Emoji.MessageFormat(), model.Count)
 	}
 
 	return result, nil
