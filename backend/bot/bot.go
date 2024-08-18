@@ -47,9 +47,6 @@ func checkNilErr(e error) {
 
 const pr = "%%"
 const rankUsedEmojisInGuild = pr + "rankUsedEmojisInGuild"
-const rankUsedEmojisInGuildAsc = pr + "rankUsedEmojisInGuild"
-const rankAvailableUsedEmojisInGuild = pr + "rankAvailableUsedEmojisInGuild"
-const rankAvailableUsedEmojisInGuildAsc = pr + "rankAvailableUsedEmojisInGuildAsc"
 
 func Run(dbc *sql.DB) {
 
@@ -61,7 +58,10 @@ func Run(dbc *sql.DB) {
 
 	// add a event handler
 	discord.AddHandler(newMessage)
+	discord.AddHandler(messageUpdated)
 	discord.AddHandler(newReaction)
+	discord.AddHandler(removedReaction)
+	discord.AddHandler(removedAllReactions)
 
 	// open session
 	discord.Open()
@@ -166,39 +166,56 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 
 		discord.ChannelMessageSendReply(message.ChannelID, res, message.Reference())
 
-	case strings.Contains(message.Content, rankAvailableUsedEmojisInGuild):
-
-		res, err := getRankedAvailableUsedEmojisInGuild(dbv, message.GuildID, 10, true)
-
-		if err != nil {
-			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
-			return
-		}
-
-		discord.ChannelMessageSendReply(message.ChannelID, res, message.Reference())
-
 	}
 
-	err := ProcessOneMessage(MessageModel{Message: message.Message}, message.GuildID, dbv, true)
+	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, dbv, true)
 
-	if err != nil {
+	if err != nil && message.Author.ID == "181180158441422848" {
 		discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
 	}
 
 	return
+}
 
+func messageUpdated(discord *discordgo.Session, message *discordgo.MessageUpdate) {
+	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, dbv, true)
+
+	if err != nil {
+		discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
+	}
 }
 
 func newReaction(discord *discordgo.Session, messageReaction *discordgo.MessageReactionAdd) {
+	processReaction(discord, messageReaction.MessageReaction)
+}
 
-	///* prevent bot responding to its own message
-	//this is achived by looking into the message author id
-	//if message.author.id is same as bot.author.id then just return
-	//*/
+func removedReaction(discord *discordgo.Session, messageReaction *discordgo.MessageReactionRemove) {
+	processReaction(discord, messageReaction.MessageReaction)
+}
+
+func removedAllReactions(discord *discordgo.Session, messageReaction *discordgo.MessageReactionRemoveAll) {
+	processReaction(discord, messageReaction.MessageReaction)
+}
+
+func processReaction(discord *discordgo.Session, messageReaction *discordgo.MessageReaction) {
+	// ignore your own reactions just in case
 	if messageReaction.UserID == discord.State.User.ID {
 		return
 	}
 
-	fmt.Println(fmt.Sprintf("%+v", messageReaction.Emoji))
+	//We don't know if its a reaction under the bot message or not, reactions under the bot messages are ignored
+	//so we need to refetch it
 
+	msg, err := discord.ChannelMessage(messageReaction.ChannelID, messageReaction.MessageID, requestConfig)
+	msg.GuildID = messageReaction.GuildID
+
+	if err != nil {
+		discord.ChannelMessageSend(messageReaction.ChannelID, "💀 Reason: "+err.Error(), requestConfig)
+	}
+
+	err = ProcessOneMessage(discord, MessageModel{Message: msg}, messageReaction.GuildID, dbv, true)
+
+	if err != nil {
+		discord.ChannelMessageSend(messageReaction.ChannelID, "💀 Reason: "+err.Error(), requestConfig)
+	}
 }

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"slices"
 )
 
 const messagesLimit = 100
@@ -76,26 +75,7 @@ func getAndSaveAllMessages(discord *discordgo.Session, bMessage *discordgo.Messa
 
 		mm := MessageModel{Message: message}
 
-		if len(message.Reactions) > 0 {
-			var reactModels []EmojiModel
-			for _, reaction := range message.Reactions {
-				users, err := discord.MessageReactions(channel.ID, message.ID, reaction.Emoji.APIName(), 100, "", "", requestConfig)
-				if err != nil {
-					fmt.Println(err.Error())
-				}
-
-				for _, user := range users {
-					if _, ok := authors[user.ID]; !ok {
-						authors[user.ID] = AuthorModel{Author: user}
-					}
-				}
-
-				reactModels = slices.Concat(reactModels, getReactionsAsModels(users, reaction.Emoji))
-			}
-			mm.Reactions = reactModels
-		}
-
-		err = ProcessOneMessage(mm, gid, db, false)
+		err = ProcessOneMessage(discord, mm, gid, db, false)
 		if err != nil {
 			errMsg := err.Error()
 			_, err = discord.ChannelMessageSendReply(reference.ChannelID, "💀 Reason: "+errMsg+" channel "+channel.Name, reference, requestConfig)

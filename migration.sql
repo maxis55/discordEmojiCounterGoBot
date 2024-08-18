@@ -24,13 +24,13 @@ create table if not exists messages
 
 create table if not exists emoji_used
 (
-    id          bigserial primary key
-        message_id varchar (255) null,
+    id          bigserial primary key,
+    message_id  varchar(255) null,
     guild_id    varchar(255) null,
     channel_id  varchar(255) null,
     author_id   varchar(255) null,
     emoji_id    varchar(255) null,
-    is_reaction bool         null,
+    is_reaction bool         null
 );
 
 create table if not exists authors

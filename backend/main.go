@@ -17,8 +17,10 @@ import (
 )
 
 func connect() (*sql.DB, error) {
-	//return sql.Open("postgres", "postgres://postgres:secret@db:5432/example?sslmode=disable")
-	return sql.Open("postgres", "postgres://postgres:secret@localhost:5432/example?sslmode=disable")
+	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		"localhost", os.Getenv("DB_PORT"), os.Getenv("POSTGRES_USER"), os.Getenv("DB_PASSWORD"), "emoji_tracker")
+
+	return sql.Open("postgres", psqlInfo)
 }
 
 func blogHandler(w http.ResponseWriter, r *http.Request) {
