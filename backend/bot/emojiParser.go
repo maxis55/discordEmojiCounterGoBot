@@ -134,7 +134,7 @@ func (model EmojiModel) remember(db *sql.DB) error {
 		guildID = nil
 	}
 
-	if _, err := db.Exec("INSERT INTO emojis (emoji_id, name, guild_id, animated) VALUES ($1, $2, $3, $4) ON CONFLICT (emoji_id) DO UPDATE SET guild_id = $3;",
+	if _, err := db.Exec("INSERT INTO emojis (emoji_id, name, guild_id, animated) VALUES ($1, $2, $3, $4) ON CONFLICT (emoji_id) DO NOTHING;",
 		model.Emoji.ID, model.Emoji.Name, guildID, model.Emoji.Animated); err != nil {
 		return err
 	}

@@ -81,9 +81,9 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		danceHere(discord, message)
 
 	case strings.HasPrefix(message.Content, "%%helpMeRankEmojis"):
-		discord.ChannelMessageSend(message.ChannelID, "This is an example, figure it out: %%rankUsedEmojisInGuild author=123 channel=123321 ignoreReactions=true belongToTheGuild=false ignoreMessageText=false fromDate=2022-01-01 toDate=2024-01-01 limit=10")
+		discord.ChannelMessageSend(message.ChannelID, "This is an example, figure it out: %%rankUsedEmojisInGuild author=123 channel=123321 ignoreReactions=true belongToTheGuild=false ignoreMessageText=false fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
 	case strings.HasPrefix(message.Content, "%%helpMeRankReactions"):
-		discord.ChannelMessageSend(message.ChannelID, "This is a special case messageAuthor only works like this(dates are optional): %%rankUsedEmojisInGuild messageAuthor=123 ignoreMessageText=true fromDate=2022-01-01 toDate=2024-01-01 limit=10")
+		discord.ChannelMessageSend(message.ChannelID, "This is a special case messageAuthor only works like this(dates are optional): %%rankUsedEmojisInGuild messageAuthor=123 ignoreMessageText=true fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
 	case strings.HasPrefix(message.Content, rankUsedEmojisInGuild):
 		s := ExtractSettings(message.Content)
 
@@ -97,6 +97,8 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 			discord.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), requestConfig)
 			return
 		}
+
+		fmt.Println(res)
 
 		discord.ChannelMessageSendReply(message.ChannelID, res, message.Reference())
 	}
