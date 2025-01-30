@@ -78,5 +78,5 @@ $ curl localhost:80
 
 Stop and remove the containers
 ```shell
-$ docker compose down
+$ docker-compose down --rmi all 
 ```

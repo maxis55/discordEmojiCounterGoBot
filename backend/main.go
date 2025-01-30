@@ -18,7 +18,9 @@ import (
 
 func connect() (*sql.DB, error) {
 	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		"localhost", os.Getenv("DB_PORT"), os.Getenv("POSTGRES_USER"), os.Getenv("DB_PASSWORD"), "emoji_tracker")
+		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"), os.Getenv("POSTGRES_USER"), os.Getenv("DB_PASSWORD"), "emoji_tracker")
+
+	fmt.Println(psqlInfo)
 
 	return sql.Open("postgres", psqlInfo)
 }
@@ -62,7 +64,7 @@ func main2() {
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatal(fmt.Sprintf("Error loading .env file because '%s'", err.Error()))
 	}
 
 	bot.Token = os.Getenv("DISCORD_KEY")
