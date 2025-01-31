@@ -18,11 +18,9 @@ type RankingSettings struct {
 	Limit             *int    `json:"limit,omitempty"`
 }
 
-// ExtractSettings takes a string of parameters and returns a RankingSettings struct
 func ExtractSettings(text string) RankingSettings {
 	settings := RankingSettings{}
 
-	// Define regex patterns for each parameter
 	patterns := map[string]*regexp.Regexp{
 		"author":            regexp.MustCompile(`author=(\d+)`),
 		"messageAuthor":     regexp.MustCompile(`messageAuthor=(\d+)`),
@@ -36,7 +34,6 @@ func ExtractSettings(text string) RankingSettings {
 		"channel":           regexp.MustCompile(`channel=(\d+)`),
 	}
 
-	// Apply each regex pattern to the text and assign to the struct
 	for key, pattern := range patterns {
 		if match := pattern.FindStringSubmatch(text); match != nil {
 			switch key {

@@ -2,17 +2,24 @@ package bot
 
 import (
 	"database/sql"
+	"discordEmojiCounterBot/utils"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"strings"
 )
 
-type EmojiRank struct {
+type RankedEmojis []RankedEmoji
+
+type RankedEmoji struct {
 	Count int
+	Rank  int
 	Emoji discordgo.Emoji
 }
 
-func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings) (string, error) {
+const maxEmbedFieldValueLen = 1024
+const maxEmbedTitleLen = 256
 
+func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings) (RankedEmojis, error) {
 	params := []interface{}{
 		gid,
 	}
@@ -30,7 +37,6 @@ func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings
 		paramsC++
 		query += fmt.Sprintf(" and eu.channel_id = $%d", paramsC)
 		params = append(params, *settings.ChannelID)
-
 	}
 
 	if settings.AuthorID != nil && *settings.AuthorID != "" {
@@ -67,53 +73,102 @@ func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings
 
 	query += " group by e.emoji_id"
 
-	if settings.Desc != nil {
-		order := "desc"
+	order := "desc"
 
-		if !*settings.Desc {
-			order = "asc"
-		}
-
-		query += fmt.Sprintf(" order by emoji_count %s", order)
+	if settings.Desc != nil && !*settings.Desc {
+		order = "asc"
 	}
+
+	query += fmt.Sprintf(" order by emoji_count %s", order)
 
 	if settings.Limit != nil && *settings.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", *settings.Limit)
 	}
 
 	rows, err := db.Query(query, params...)
+
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var models []EmojiRank
+	currRank := 1
+	var rankedEmojis RankedEmojis
 
 	for rows.Next() {
-		model := EmojiRank{Emoji: discordgo.Emoji{}}
-		err = rows.Scan(&model.Emoji.ID, &model.Emoji.Name, &model.Emoji.Animated, &model.Count)
+		rankedEmoji := RankedEmoji{Emoji: discordgo.Emoji{}, Rank: currRank}
+		err = rows.Scan(&rankedEmoji.Emoji.ID, &rankedEmoji.Emoji.Name, &rankedEmoji.Emoji.Animated, &rankedEmoji.Count)
 
-		if emojiRegex.MatchString(model.Emoji.Name) {
-			model.Emoji.ID = ""
+		if emojiRegex.MatchString(rankedEmoji.Emoji.Name) {
+			rankedEmoji.Emoji.ID = ""
 		}
 
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
-		models = append(models, model)
+		rankedEmojis = append(rankedEmojis, rankedEmoji)
+		currRank++
 	}
 
-	var result string
+	return rankedEmojis, nil
+}
 
-	for i, model := range models {
-		result += fmt.Sprintf("%d. %s - %d \n", i+1, model.Emoji.MessageFormat(), model.Count)
+//max embed size is 6000
+//each embed field has max value len of 1024
+//by sending max 1024*5, there's room to spare for settings(in title, 256 symbols), etc
+//send *columns* fields in each embed message, this way there's always room to spare
+
+func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discordgo.MessageEmbed {
+	if len(*res) == 0 {
+		return []discordgo.MessageEmbed{{Title: settingsJS, Description: "No results."}}
 	}
 
-	if result == "" {
-		result = "Empty set."
+	var embeds []discordgo.MessageEmbed
+
+	const columns = 5
+
+	formattedSlice := res.getFormattedSlice()
+
+	slicedRankedEmojis := utils.ChunkSliceValuesByLen(formattedSlice, maxEmbedFieldValueLen)
+
+	embedCount := 0
+	var embed discordgo.MessageEmbed
+
+	for columnIndex, column := range slicedRankedEmojis {
+		if columnIndex%columns == 0 {
+			if len(embed.Fields) > 0 {
+				embeds = append(embeds, embed)
+			}
+
+			title := settingsJS
+			if len(slicedRankedEmojis) > columns {
+				title = fmt.Sprintf("%s #%d", title, embedCount+1)
+			}
+
+			embed = discordgo.MessageEmbed{Title: title}
+			embedCount++
+		}
+
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Value: strings.Join(column, ""), Inline: true})
+	}
+	embeds = append(embeds, embed)
+
+	return embeds
+
+}
+
+func (re *RankedEmoji) getEmbedContent() string {
+	return fmt.Sprintf("%d. %s - %d", re.Rank, re.Emoji.MessageFormat(), re.Count)
+}
+
+func (res *RankedEmojis) getFormattedSlice() []string {
+	var result []string
+
+	for _, re := range *res {
+		result = append(result, re.getEmbedContent()+"\n")
 	}
 
-	return result, nil
+	return result
 }
 
 //select a.username, count(*) as blabbing_messages
