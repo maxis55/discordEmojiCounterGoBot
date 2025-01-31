@@ -147,7 +147,7 @@ func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discord
 				title := settingsJS
 
 				if len(slicedRankedEmojis) > maxColumnsBasedOnChars {
-					title = fmt.Sprintf("%s #%d", title, embedCount+1)
+					title = fmt.Sprintf("%s #%d", title, embedCount)
 				}
 
 				embed = discordgo.MessageEmbed{Title: title}
