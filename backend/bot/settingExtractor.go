@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"encoding/json"
 	"regexp"
 	"strconv"
 )
@@ -77,4 +78,9 @@ func ExtractSettings(text string) RankingSettings {
 	}
 
 	return settings
+}
+
+func (s *RankingSettings) ToJsonString() string {
+	js, _ := json.Marshal(s)
+	return string(js)
 }
