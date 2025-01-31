@@ -10,17 +10,13 @@ import (
 )
 
 type MessageModel struct {
-	Message   *discordgo.Message
-	Reactions []EmojiModel
+	Message *discordgo.Message
 }
 
 type AuthorModel struct {
 	Author *discordgo.User
 }
 
-type GuildModel struct {
-	Guild *discordgo.Guild
-}
 type ChannelModel struct {
 	Channel *discordgo.Channel
 }
@@ -59,31 +55,6 @@ func queryChannelById(db *sql.DB, cid string) (*ChannelModel, error) {
 	}
 
 	return model, nil
-}
-
-func (model *GuildModel) remember(db *sql.DB) error {
-	valuesMap := map[string]any{
-		"guild_id":          model.Guild.ID,
-		"name":              model.Guild.Name,
-		"system_channel_id": model.Guild.SystemChannelID,
-		"region":            model.Guild.Region,
-		"member_count":      model.Guild.MemberCount,
-		"icon":              model.Guild.Icon,
-		"joined_at":         model.Guild.JoinedAt,
-		"owner_id":          model.Guild.OwnerID,
-	}
-
-	fields := utils.GetKeysFromMap(valuesMap)
-	values := utils.GetValuesFromMapBasedOnKeys(valuesMap, fields)
-
-	query := fmt.Sprintf(`
-		INSERT INTO guilds (%s)
-		VALUES (%s)
-		ON CONFLICT (guild_id) DO NOTHING;
-	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
-
-	_, err := db.Exec(query, values...)
-	return err
 }
 
 func (cm *ChannelModel) remember(db *sql.DB) error {

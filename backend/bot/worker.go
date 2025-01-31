@@ -3,29 +3,24 @@ package bot
 import (
 	"database/sql"
 	"github.com/bwmarrin/discordgo"
-	"slices"
 )
 
-func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid string, db *sql.DB, saveRightAway bool) error {
+func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid string, db *sql.DB, rememberAuthor bool) error {
 	if message.Message.Author.Bot {
 		return nil
 	}
 
-	reacts, err := populateReactionEmojis(discord, message)
+	ejs, err := message.GetEmojisFromMessage(discord)
 
 	if err != nil {
 		return err
 	}
 
-	message.Reactions = reacts
-
-	ejs := message.GetEmojisFromMessage()
-
 	//js, _ := json.Marshal(m)
 	//fmt.Println(string(js))
 
 	//save to DB
-	saveEmojis(ejs, db)
+	rememberNewEmojis(ejs, db)
 
 	err = cleanInfoAboutMessage(message.Message.ID, db)
 	if err != nil {
@@ -42,7 +37,7 @@ func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid str
 		return err
 	}
 
-	if saveRightAway {
+	if rememberAuthor {
 		err = AuthorModel{Author: message.Message.Author}.remember(db)
 		if err != nil {
 			return err
@@ -50,20 +45,4 @@ func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid str
 	}
 
 	return nil
-}
-
-func populateReactionEmojis(discord *discordgo.Session, message MessageModel) ([]EmojiModel, error) {
-	if len(message.Message.Reactions) > 0 {
-		var reactModels []EmojiModel
-		for _, reaction := range message.Message.Reactions {
-			users, err := discord.MessageReactions(message.Message.ChannelID, message.Message.ID, reaction.Emoji.APIName(), 100, "", "", requestConfig)
-			if err != nil {
-				return nil, err
-			}
-
-			reactModels = slices.Concat(reactModels, getReactionsAsModels(users, reaction.Emoji, message))
-		}
-		return reactModels, nil
-	}
-	return nil, nil
 }

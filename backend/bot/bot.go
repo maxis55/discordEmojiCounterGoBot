@@ -1,26 +1,14 @@
 package bot
 
 import (
-	"bytes"
-	"database/sql"
-	"encoding/json"
+	"discordEmojiCounterBot/db"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 )
-
-var Token string
-var dbv *sql.DB
-
-var dancers = [...]string{"💃", "💃🏻", "💃🏼", "💃🏽", "💃🏾", "💃🏿", "🕺🏿", "🕺🏾", "🕺🏽", "🕺🏼", "🕺🏻", "🕺"}
-
-type DiscordWebhookMessage struct {
-	Content string `json:"content"`
-}
 
 func checkNilErr(e error) {
 	if e != nil {
@@ -31,12 +19,10 @@ func checkNilErr(e error) {
 const pr = "%%"
 const rankUsedEmojisInGuild = pr + "rankUsedEmojisInGuild"
 
-func Run(dbc *sql.DB) {
-
-	dbv = dbc
+func Run() {
 
 	// create a session
-	discord, err := discordgo.New("Bot " + Token)
+	discord, err := discordgo.New("Bot " + os.Getenv("DISCORD_KEY"))
 	checkNilErr(err)
 
 	// add a event handler
@@ -79,109 +65,26 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 
 	case strings.HasPrefix(message.Content, "%%saveEverythingAboutThisGuild"):
 		discord.ChannelMessageSend(message.ChannelID, "Ok")
-		saveGuildInfo(discord, message.GuildID, dbv)
+		saveGuildInfo(discord, message.GuildID, db.Connection)
 		discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())
 
 	case strings.HasPrefix(message.Content, "%%danceInEveryChannel"):
-		danceInEveryChannel(discord, message)
+		dance(discord, message, "")
 
 	case strings.HasPrefix(message.Content, "%%danceHere"):
-		danceHere(discord, message)
+		dance(discord, message, message.ChannelID)
 
 	case strings.HasPrefix(message.Content, "%%helpMeRankEmojis"):
 		discord.ChannelMessageSend(message.ChannelID, "This is an example, figure it out: %%rankUsedEmojisInGuild author=123 channel=123321 ignoreReactions=true belongToTheGuild=false ignoreMessageText=false fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
 	case strings.HasPrefix(message.Content, "%%helpMeRankReactions"):
 		discord.ChannelMessageSend(message.ChannelID, "This is a special case messageAuthor only works like this(dates are optional): %%rankUsedEmojisInGuild messageAuthor=123 ignoreMessageText=true fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
 	case strings.HasPrefix(message.Content, rankUsedEmojisInGuild):
-		s := ExtractSettings(message.Content)
-
-		rankedEmojis, err := getRankedUsedEmojisInGuild(dbv, message.GuildID, s)
-
-		if err != nil {
-			NotifyAboutErrorViaWebhook(err)
-			_, err = discord.ChannelMessageSend(message.ChannelID, "There was an error, try again later")
-			return
-		}
-
-		embeds := rankedEmojis.TransformIntoDiscordEmbeds(s.ToJsonString())
-
-		for _, embed := range embeds {
-			_, err = discord.ChannelMessageSendEmbed(message.ChannelID, &embed)
-
-			NotifyAboutErrorViaWebhook(err)
-		}
+		rankingHandler(discord, message)
 	}
 
-	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, dbv, true)
+	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, db.Connection, true)
 
 	NotifyAboutErrorViaWebhook(err)
 
 	return
-}
-
-func messageUpdated(_ *discordgo.Session, message *discordgo.MessageUpdate) {
-	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, dbv, true)
-
-	NotifyAboutErrorViaWebhook(err)
-}
-
-func newReaction(discord *discordgo.Session, messageReaction *discordgo.MessageReactionAdd) {
-	processReaction(discord, messageReaction.MessageReaction)
-}
-
-func removedReaction(discord *discordgo.Session, messageReaction *discordgo.MessageReactionRemove) {
-	processReaction(discord, messageReaction.MessageReaction)
-}
-
-func removedAllReactions(discord *discordgo.Session, messageReaction *discordgo.MessageReactionRemoveAll) {
-	processReaction(discord, messageReaction.MessageReaction)
-}
-
-func processReaction(discord *discordgo.Session, messageReaction *discordgo.MessageReaction) {
-	// ignore your own reactions just in case
-	if messageReaction.UserID == discord.State.User.ID {
-		return
-	}
-
-	//We don't know if it's a reaction under the bot message or not, reactions under the bot messages are ignored
-	//so we need to re-fetch it
-	msg, err := discord.ChannelMessage(messageReaction.ChannelID, messageReaction.MessageID, requestConfig)
-	msg.GuildID = messageReaction.GuildID
-
-	if err != nil {
-		NotifyAboutErrorViaWebhook(err)
-		return
-	}
-
-	err = ProcessOneMessage(discord, MessageModel{Message: msg}, messageReaction.GuildID, dbv, true)
-
-	NotifyAboutErrorViaWebhook(err)
-}
-
-func NotifyAboutErrorViaWebhook(botErr error) {
-	if botErr == nil {
-		return
-	}
-
-	payload := DiscordWebhookMessage{
-		Content: fmt.Sprintf("<@%s> 💀 Reason: %s", os.Getenv("BOT_MASTER_ID"), botErr.Error()),
-	}
-
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		log.Println(fmt.Sprintf("Failed to marshal payload: %v", err))
-		return
-	}
-
-	resp, err := http.Post(os.Getenv("DISCORD_WEBHOOK_URL"), "application/json", bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		log.Println(fmt.Sprintf("Failed to send webhook: %v", err))
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusNoContent {
-		log.Println(fmt.Sprintf("Unexpected response from Discord: %s", resp.Status))
-		return
-	}
 }
