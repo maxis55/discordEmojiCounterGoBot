@@ -117,6 +117,7 @@ func getRankedUsedEmojisInGuild(db *sql.DB, gid string, rs RankingSettings) (Ran
 //each embed field has max value len of 1024
 //by sending max 1024*5, there's room to spare for settings(in title, 256 symbols), etc
 //send *columns* fields in each embed message, this way there's always room to spare
+//before sending - redistribute between 6 fields to make messages more event
 
 func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discordgo.MessageEmbed {
 	if len(*res) == 0 {
@@ -124,31 +125,37 @@ func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discord
 	}
 
 	var embeds []discordgo.MessageEmbed
-
-	const columns = 5
-	formattedSlice := res.getFormattedSlice()
-	slicedRankedEmojis := utils.ChunkSliceValuesByLen(formattedSlice, maxEmbedFieldValueLen)
-
 	embedCount := 0
 	var embed discordgo.MessageEmbed
 
-	for columnIndex, column := range slicedRankedEmojis {
-		if columnIndex%columns == 0 {
-			if len(embed.Fields) > 0 {
-				embeds = append(embeds, embed)
+	const maxColumnsBasedOnChars = 5
+	const redistributedColumnsCount = 6
+	formattedSlice := res.getFormattedSlice()
+	slicedRankedEmojis := utils.ChunkSliceValuesByLen(formattedSlice, maxEmbedFieldValueLen)
+	chunkedRankedEmojis := utils.ChunkSlice(slicedRankedEmojis, maxColumnsBasedOnChars)
+
+	for _, chunk := range chunkedRankedEmojis {
+		redistributedSlices := utils.RedistributeSlicesIntoAmount(chunk, redistributedColumnsCount)
+
+		for columnIndex, column := range redistributedSlices {
+			if columnIndex%redistributedColumnsCount == 0 {
+				if len(embed.Fields) > 0 {
+					embeds = append(embeds, embed)
+				}
+
+				embedCount++
+				title := settingsJS
+
+				if len(slicedRankedEmojis) > maxColumnsBasedOnChars {
+					title = fmt.Sprintf("%s #%d", title, embedCount+1)
+				}
+
+				embed = discordgo.MessageEmbed{Title: title}
 			}
 
-			embedCount++
-			title := settingsJS
-
-			if len(slicedRankedEmojis) > columns {
-				title = fmt.Sprintf("%s #%d", title, embedCount+1)
-			}
-
-			embed = discordgo.MessageEmbed{Title: title}
+			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Value: strings.Join(column, ""), Inline: true})
 		}
 
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Value: strings.Join(column, ""), Inline: true})
 	}
 
 	embeds = append(embeds, embed)
@@ -157,7 +164,7 @@ func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discord
 }
 
 func (re *RankedEmoji) getEmbedContent() string {
-	return fmt.Sprintf("%d. %s - %d", re.Rank, re.Emoji.MessageFormat(), re.Count)
+	return fmt.Sprintf("**%d**. %s - %d", re.Rank, re.Emoji.MessageFormat(), re.Count)
 }
 
 func (res *RankedEmojis) getFormattedSlice() []string {

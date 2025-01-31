@@ -32,6 +32,42 @@ func ChunkSliceValuesByLen(input []string, maxChunkLen int) [][]string {
 	return chunks
 }
 
+func ChunkSlice[T any](items []T, chunkSize int) (chunks [][]T) {
+	for chunkSize < len(items) {
+		items, chunks = items[chunkSize:], append(chunks, items[0:chunkSize:chunkSize])
+	}
+	return append(chunks, items)
+}
+
+func RedistributeSlicesIntoAmount(chunk [][]string, newSize int) [][]string {
+	totalLength := 0
+	for _, slice := range chunk {
+		for _, str := range slice {
+			totalLength += len(str)
+		}
+	}
+	idealLength := totalLength / newSize
+
+	newSlices := make([][]string, newSize)
+
+	currentSlice := 0
+	currentLength := 0
+	firstSliceFilled := false
+	for _, slice := range chunk {
+		for _, str := range slice {
+			if currentLength+len(str) > idealLength && currentSlice < newSize-1 && firstSliceFilled {
+				currentSlice++
+				currentLength = 0
+			}
+			newSlices[currentSlice] = append(newSlices[currentSlice], str)
+			currentLength += len(str)
+			firstSliceFilled = true
+		}
+	}
+
+	return newSlices
+}
+
 func GetMD5Hash(s string) string {
 	hash := md5.Sum([]byte(s))
 	return hex.EncodeToString(hash[:])
