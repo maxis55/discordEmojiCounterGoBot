@@ -37,7 +37,7 @@ func saveGuildInfo(discord *discordgo.Session, gid string, db *sql.DB) {
 		fmt.Println(err.Error())
 	}
 
-	err = GuildModel{Guild: guild}.remember(db)
+	err = (&GuildModel{Guild: guild}).remember(db)
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -64,7 +64,7 @@ func saveGuildInfo(discord *discordgo.Session, gid string, db *sql.DB) {
 	}
 
 	for _, channel := range channels {
-		err = ChannelModel{Channel: channel}.remember(db)
+		err = (&ChannelModel{Channel: channel}).remember(db)
 		if err != nil {
 			fmt.Println(err.Error())
 		}

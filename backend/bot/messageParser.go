@@ -2,8 +2,11 @@ package bot
 
 import (
 	"database/sql"
+	"discordEmojiCounterBot/utils"
 	"errors"
+	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"strings"
 )
 
 type MessageModel struct {
@@ -58,51 +61,105 @@ func queryChannelById(db *sql.DB, cid string) (*ChannelModel, error) {
 	return model, nil
 }
 
-func (model GuildModel) remember(db *sql.DB) error {
-
-	params := []interface{}{
-		model.Guild.ID,
-		model.Guild.Name,
-		model.Guild.SystemChannelID,
-		model.Guild.Region,
-		model.Guild.MemberCount,
-		model.Guild.Icon,
-		model.Guild.JoinedAt,
-		model.Guild.OwnerID,
+func (model *GuildModel) remember(db *sql.DB) error {
+	valuesMap := map[string]any{
+		"guild_id":          model.Guild.ID,
+		"name":              model.Guild.Name,
+		"system_channel_id": model.Guild.SystemChannelID,
+		"region":            model.Guild.Region,
+		"member_count":      model.Guild.MemberCount,
+		"icon":              model.Guild.Icon,
+		"joined_at":         model.Guild.JoinedAt,
+		"owner_id":          model.Guild.OwnerID,
 	}
 
-	if _, err := db.Exec(`INSERT INTO guilds (guild_id, name, system_channel_id, region, member_count, icon, joined_at, owner_id)
-									VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (guild_id) DO NOTHING;`, params...); err != nil {
-		return err
-	}
-	return nil
+	fields := utils.GetKeysFromMap(valuesMap)
+	values := utils.GetValuesFromMapBasedOnKeys(valuesMap, fields)
+
+	query := fmt.Sprintf(`
+		INSERT INTO guilds (%s)
+		VALUES (%s)
+		ON CONFLICT (guild_id) DO NOTHING;
+	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
+
+	_, err := db.Exec(query, values...)
+	return err
 }
 
-func (model ChannelModel) remember(db *sql.DB) error {
-	if _, err := db.Exec("INSERT INTO channels (channel_id, owner_id, name, type, application_id, parent_id, guild_id, nsfw, position)"+
-		" VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (channel_id) DO NOTHING;",
-		model.Channel.ID, model.Channel.OwnerID, model.Channel.Name, model.Channel.Type, model.Channel.ApplicationID, model.Channel.ParentID, model.Channel.GuildID, model.Channel.NSFW, model.Channel.Position); err != nil {
-		return err
+func (cm *ChannelModel) remember(db *sql.DB) error {
+	valuesMap := map[string]any{
+		"channel_id":     cm.Channel.ID,
+		"owner_id":       cm.Channel.OwnerID,
+		"name":           cm.Channel.Name,
+		"type":           cm.Channel.Type,
+		"application_id": cm.Channel.ApplicationID,
+		"parent_id":      cm.Channel.ParentID,
+		"guild_id":       cm.Channel.GuildID,
+		"nsfw":           cm.Channel.NSFW,
+		"position":       cm.Channel.Position,
 	}
-	return nil
+
+	fields := utils.GetKeysFromMap(valuesMap)
+	values := utils.GetValuesFromMapBasedOnKeys(valuesMap, fields)
+
+	query := fmt.Sprintf(`
+		INSERT INTO channels (%s)
+		VALUES (%s)
+		ON CONFLICT (channel_id) DO NOTHING;
+	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
+
+	_, err := db.Exec(query, values...)
+
+	return err
 }
 
-func (model MessageModel) remember(gid string, db *sql.DB) error {
-	if _, err := db.Exec("INSERT INTO messages (message_id, content, guild_id, channel_id, type, author_id, timestamp, edited_timestamp)"+
-		" VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (message_id) DO NOTHING;",
-		model.Message.ID, model.Message.Content, gid, model.Message.ChannelID, model.Message.Type, model.Message.Author.ID, model.Message.Timestamp, model.Message.EditedTimestamp); err != nil {
-		return err
+func (mm *MessageModel) remember(gid string, db *sql.DB) error {
+	valuesMap := map[string]any{
+		"message_id":       mm.Message.ID,
+		"content":          mm.Message.Content,
+		"guild_id":         gid,
+		"channel_id":       mm.Message.ChannelID,
+		"type":             mm.Message.Type,
+		"author_id":        mm.Message.Author.ID,
+		"timestamp":        mm.Message.Timestamp,
+		"edited_timestamp": mm.Message.EditedTimestamp,
 	}
-	return nil
+
+	fields := utils.GetKeysFromMap(valuesMap)
+	values := utils.GetValuesFromMapBasedOnKeys(valuesMap, fields)
+
+	query := fmt.Sprintf(`
+		INSERT INTO messages (%s)
+		VALUES (%s)
+		ON CONFLICT (message_id) DO NOTHING;
+	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
+
+	_, err := db.Exec(query, values...)
+	return err
 }
 
-// guild id is required separately because message is not guaranteed to have it
-func (model MessageModel) saveEmojiUsages(db *sql.DB, emojiModels []EmojiModel, gid string) error {
-
+func (mm *MessageModel) saveEmojiUsages(db *sql.DB, emojiModels []EmojiModel, gid string) error {
 	for _, emj := range emojiModels {
-		if _, err := db.Exec(`INSERT INTO emoji_used (message_id, guild_id, channel_id,  author_id, emoji_id, is_reaction, timestamp, m_author_id)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
-			model.Message.ID, gid, model.Message.ChannelID, emj.AuthorID, emj.Emoji.ID, emj.IsReaction, emj.Timestamp, emj.MessageAuthorId); err != nil {
+		valuesMap := map[string]any{
+			"message_id":  mm.Message.ID,
+			"guild_id":    gid,
+			"channel_id":  mm.Message.ChannelID,
+			"author_id":   emj.AuthorID,
+			"emoji_id":    emj.Emoji.ID,
+			"is_reaction": emj.IsReaction,
+			"timestamp":   emj.Timestamp,
+			"m_author_id": emj.MessageAuthorId,
+		}
+
+		fields := utils.GetKeysFromMap(valuesMap)
+		values := utils.GetValuesFromMapBasedOnKeys(valuesMap, fields)
+
+		query := fmt.Sprintf(`
+			INSERT INTO emoji_used (%s)
+			VALUES (%s);
+		`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
+
+		if _, err := db.Exec(query, values...); err != nil {
 			return err
 		}
 	}
@@ -110,12 +167,27 @@ func (model MessageModel) saveEmojiUsages(db *sql.DB, emojiModels []EmojiModel, 
 }
 
 func (model AuthorModel) remember(db *sql.DB) error {
-	if _, err := db.Exec("INSERT INTO authors (author_id, verified, username, global_name, bot, system, mfa_enabled)"+
-		" VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (author_id) DO NOTHING;",
-		model.Author.ID, model.Author.Verified, model.Author.Username, model.Author.GlobalName, model.Author.Bot, model.Author.System, model.Author.MFAEnabled); err != nil {
-		return err
+	valuesMap := map[string]any{
+		"author_id":   model.Author.ID,
+		"verified":    model.Author.Verified,
+		"username":    model.Author.Username,
+		"global_name": model.Author.GlobalName,
+		"bot":         model.Author.Bot,
+		"system":      model.Author.System,
+		"mfa_enabled": model.Author.MFAEnabled,
 	}
-	return nil
+
+	fields := utils.GetKeysFromMap(valuesMap)
+	values := utils.GetValuesFromMapBasedOnKeys(valuesMap, fields)
+
+	query := fmt.Sprintf(`
+		INSERT INTO authors (%s)
+		VALUES (%s)
+		ON CONFLICT (author_id) DO NOTHING;
+	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
+
+	_, err := db.Exec(query, values...)
+	return err
 }
 
 func cleanInfoAboutMessage(mid string, db *sql.DB) error {

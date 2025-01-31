@@ -68,7 +68,7 @@ func ExtractSettings(text string) RankingSettings {
 	}
 
 	if settings.Limit == nil || *settings.Limit < 1 {
-		l := 10
+		l := 80
 		settings.Limit = &l
 	}
 

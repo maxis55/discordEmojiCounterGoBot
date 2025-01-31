@@ -19,73 +19,73 @@ type RankedEmoji struct {
 const maxEmbedFieldValueLen = 1024
 const maxEmbedTitleLen = 256
 
-func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings) (RankedEmojis, error) {
-	params := []interface{}{
-		gid,
-	}
-	paramsC := 1
+func getRankedUsedEmojisInGuild(db *sql.DB, gid string, rs RankingSettings) (RankedEmojis, error) {
+	var params []interface{}
+	var queryBuilder strings.Builder
 
-	query := `select e.emoji_id, e.name, e.animated, COUNT(eu.id) as emoji_count
-									from emoji_used eu join emojis e on eu.emoji_id = e.emoji_id
-									where eu.guild_id = $1`
+	params = append(params, gid)
 
-	if settings.BelongToTheGuild != nil && *settings.BelongToTheGuild {
-		query += " and e.guild_id = $1"
-	}
+	queryBuilder.WriteString(`select e.emoji_id, e.name, e.animated, COUNT(eu.id) as emoji_count
+		from emoji_used eu join emojis e on eu.emoji_id = e.emoji_id
+		where eu.guild_id = $1`)
 
-	if settings.ChannelID != nil && *settings.ChannelID != "" {
-		paramsC++
-		query += fmt.Sprintf(" and eu.channel_id = $%d", paramsC)
-		params = append(params, *settings.ChannelID)
+	var conditions []string
+
+	if rs.BelongToTheGuild != nil && *rs.BelongToTheGuild {
+		conditions = append(conditions, "e.guild_id = $1")
 	}
 
-	if settings.AuthorID != nil && *settings.AuthorID != "" {
-		paramsC++
-		query += fmt.Sprintf(" and eu.author_id = $%d", paramsC)
-		params = append(params, *settings.AuthorID)
+	if rs.ChannelID != nil && *rs.ChannelID != "" {
+		params = append(params, *rs.ChannelID)
+		conditions = append(conditions, fmt.Sprintf("eu.channel_id = $%d", len(params)))
 	}
 
-	if settings.MessageAuthorId != nil && *settings.MessageAuthorId != "" {
-		paramsC++
-		query += fmt.Sprintf(" and eu.m_author_id = $%d", paramsC)
-		params = append(params, *settings.MessageAuthorId)
+	if rs.AuthorID != nil && *rs.AuthorID != "" {
+		params = append(params, *rs.AuthorID)
+		conditions = append(conditions, fmt.Sprintf("eu.author_id = $%d", len(params)))
 	}
 
-	if settings.IgnoreReactions != nil && *settings.IgnoreReactions {
-		query += " and eu.is_reaction != true"
+	if rs.MessageAuthorId != nil && *rs.MessageAuthorId != "" {
+		params = append(params, *rs.MessageAuthorId)
+		conditions = append(conditions, fmt.Sprintf("eu.m_author_id = $%d", len(params)))
 	}
 
-	if settings.IgnoreMessageText != nil && *settings.IgnoreMessageText {
-		query += " and eu.is_reaction != false"
+	if rs.IgnoreReactions != nil && *rs.IgnoreReactions {
+		conditions = append(conditions, "eu.is_reaction != true")
 	}
 
-	if settings.FromDate != nil && *settings.FromDate != "" {
-		paramsC++
-		query += fmt.Sprintf(" and eu.timestamp >= $%d::timestamp", paramsC)
-		params = append(params, *settings.FromDate)
+	if rs.IgnoreMessageText != nil && *rs.IgnoreMessageText {
+		conditions = append(conditions, "eu.is_reaction != false")
 	}
 
-	if settings.ToDate != nil && *settings.ToDate != "" {
-		paramsC++
-		query += fmt.Sprintf(" and eu.timestamp <= $%d::timestamp", paramsC)
-		params = append(params, *settings.ToDate)
+	if rs.FromDate != nil && *rs.FromDate != "" {
+		params = append(params, *rs.FromDate)
+		conditions = append(conditions, fmt.Sprintf("eu.timestamp >= $%d::timestamp", len(params)))
 	}
 
-	query += " group by e.emoji_id"
+	if rs.ToDate != nil && *rs.ToDate != "" {
+		params = append(params, *rs.ToDate)
+		conditions = append(conditions, fmt.Sprintf("eu.timestamp <= $%d::timestamp", len(params)))
+	}
+
+	if len(conditions) > 0 {
+		queryBuilder.WriteString(" and " + strings.Join(conditions, " and "))
+	}
+
+	queryBuilder.WriteString(" group by e.emoji_id")
 
 	order := "desc"
-
-	if settings.Desc != nil && !*settings.Desc {
+	if rs.Desc != nil && !*rs.Desc {
 		order = "asc"
 	}
 
-	query += fmt.Sprintf(" order by emoji_count %s", order)
+	queryBuilder.WriteString(fmt.Sprintf(" order by emoji_count %s", order))
 
-	if settings.Limit != nil && *settings.Limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", *settings.Limit)
+	if rs.Limit != nil && *rs.Limit > 0 {
+		queryBuilder.WriteString(fmt.Sprintf(" LIMIT %d", *rs.Limit))
 	}
 
-	rows, err := db.Query(query, params...)
+	rows, err := db.Query(queryBuilder.String(), params...)
 
 	if err != nil {
 		return nil, err
@@ -98,12 +98,12 @@ func getRankedUsedEmojisInGuild(db *sql.DB, gid string, settings RankingSettings
 		rankedEmoji := RankedEmoji{Emoji: discordgo.Emoji{}, Rank: currRank}
 		err = rows.Scan(&rankedEmoji.Emoji.ID, &rankedEmoji.Emoji.Name, &rankedEmoji.Emoji.Animated, &rankedEmoji.Count)
 
-		if emojiRegex.MatchString(rankedEmoji.Emoji.Name) {
-			rankedEmoji.Emoji.ID = ""
-		}
-
 		if err != nil {
 			return nil, err
+		}
+
+		if emojiRegex.MatchString(rankedEmoji.Emoji.Name) {
+			rankedEmoji.Emoji.ID = ""
 		}
 
 		rankedEmojis = append(rankedEmojis, rankedEmoji)
@@ -126,9 +126,7 @@ func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discord
 	var embeds []discordgo.MessageEmbed
 
 	const columns = 5
-
 	formattedSlice := res.getFormattedSlice()
-
 	slicedRankedEmojis := utils.ChunkSliceValuesByLen(formattedSlice, maxEmbedFieldValueLen)
 
 	embedCount := 0
@@ -140,21 +138,22 @@ func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discord
 				embeds = append(embeds, embed)
 			}
 
+			embedCount++
 			title := settingsJS
+
 			if len(slicedRankedEmojis) > columns {
 				title = fmt.Sprintf("%s #%d", title, embedCount+1)
 			}
 
 			embed = discordgo.MessageEmbed{Title: title}
-			embedCount++
 		}
 
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Value: strings.Join(column, ""), Inline: true})
 	}
+
 	embeds = append(embeds, embed)
 
 	return embeds
-
 }
 
 func (re *RankedEmoji) getEmbedContent() string {

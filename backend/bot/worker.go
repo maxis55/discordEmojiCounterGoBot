@@ -19,7 +19,7 @@ func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid str
 
 	message.Reactions = reacts
 
-	ejs := getEmojisFromMessage(message)
+	ejs := message.GetEmojisFromMessage()
 
 	//js, _ := json.Marshal(m)
 	//fmt.Println(string(js))

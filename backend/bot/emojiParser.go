@@ -1,17 +1,16 @@
 package bot
 
 import (
-	"crypto/md5"
 	"database/sql"
-	"encoding/hex"
+	"discordEmojiCounterBot/utils"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 )
 
-// EmojiModel we can approximate that emote was used when message was created
 type EmojiModel struct {
 	Emoji           discordgo.Emoji
 	AuthorID        *string
@@ -25,36 +24,36 @@ var emojiRegex = regexp.MustCompile(`[#*0-9]\x{FE0F}?\x{20E3}|©\x{FE0F}?|[®\x{
 
 var discordEmojiRegex = regexp.MustCompile(`\<([a]?)\:([^:]*)\:(\d*)\>`)
 
-func getEmojisFromMessage(message MessageModel) []EmojiModel {
-	def := getDefaultEmojisFromString(message.Message)
-	dis := getDiscordEmojisFromString(message.Message)
-	reacts := message.Reactions
+func (mm *MessageModel) GetEmojisFromMessage() []EmojiModel {
+	def := mm.getDefaultEmojis()
+	dis := mm.getDiscordEmojis()
+	reactions := mm.Reactions
 
-	r := slices.Concat(def, dis, reacts)
+	r := slices.Concat(def, dis, reactions)
 	return r
 }
 
-func getDefaultEmojisFromString(m *discordgo.Message) []EmojiModel {
-	ms := emojiRegex.FindAllStringSubmatch(m.Content, -1)
+func (mm *MessageModel) getDefaultEmojis() []EmojiModel {
+	ms := emojiRegex.FindAllStringSubmatch(mm.Message.Content, -1)
 
 	res := make([]EmojiModel, 0, len(ms))
 
 	for _, match := range ms {
 		res = append(res, EmojiModel{
 			Emoji: discordgo.Emoji{
-				ID:       getMD5Hash(match[0]),
+				ID:       utils.GetMD5Hash(match[0]),
 				Name:     match[0],
 				Animated: false,
 			},
-			Timestamp: m.Timestamp,
-			AuthorID:  &m.Author.ID,
+			Timestamp: mm.Message.Timestamp,
+			AuthorID:  &mm.Message.Author.ID,
 		})
 	}
 	return res
 }
 
-func getDiscordEmojisFromString(m *discordgo.Message) []EmojiModel {
-	ms := discordEmojiRegex.FindAllStringSubmatch(m.Content, -1)
+func (mm *MessageModel) getDiscordEmojis() []EmojiModel {
+	ms := discordEmojiRegex.FindAllStringSubmatch(mm.Message.Content, -1)
 
 	res := make([]EmojiModel, 0, len(ms))
 
@@ -65,18 +64,13 @@ func getDiscordEmojisFromString(m *discordgo.Message) []EmojiModel {
 				Name:     match[2],
 				Animated: match[1] == "a",
 			},
-			Timestamp: m.Timestamp,
-			AuthorID:  &m.Author.ID,
+			Timestamp: mm.Message.Timestamp,
+			AuthorID:  &mm.Message.Author.ID,
 		})
 
 	}
 
 	return res
-}
-
-func getMD5Hash(text string) string {
-	hash := md5.Sum([]byte(text))
-	return hex.EncodeToString(hash[:])
 }
 
 func getReactionsAsModels(users []*discordgo.User, emoji *discordgo.Emoji, message MessageModel) []EmojiModel {
@@ -86,7 +80,7 @@ func getReactionsAsModels(users []*discordgo.User, emoji *discordgo.Emoji, messa
 	eId := emoji.ID
 
 	if eId == "" {
-		eId = getMD5Hash(emoji.Name)
+		eId = utils.GetMD5Hash(emoji.Name)
 	}
 
 	for _, user := range users {
@@ -108,36 +102,43 @@ func getReactionsAsModels(users []*discordgo.User, emoji *discordgo.Emoji, messa
 
 func saveEmojis(ejs []EmojiModel, db *sql.DB) {
 	seen := make(map[string]bool)
-	var unique []EmojiModel
+	var uniqueEmojis []EmojiModel
 
 	for _, model := range ejs {
 
 		key := model.Emoji.ID + model.Emoji.Name
 		if !seen[key] {
 			seen[key] = true
-			unique = append(unique, model)
+			uniqueEmojis = append(uniqueEmojis, model)
 		}
 	}
-	for _, model := range unique {
-		err := model.remember(db)
+
+	for _, emoji := range uniqueEmojis {
+		err := emoji.remember(db)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
 	}
 }
 
-func (model EmojiModel) remember(db *sql.DB) error {
-	var guildID interface{}
-	if model.GuildID != nil {
-		guildID = model.GuildID
-	} else {
-		guildID = nil
+func (model *EmojiModel) remember(db *sql.DB) error {
+	valuesMap := map[string]any{
+		"emoji_id": model.Emoji.ID,
+		"name":     model.Emoji.Name,
+		"guild_id": model.GuildID,
+		"animated": model.Emoji.Animated,
 	}
 
-	if _, err := db.Exec("INSERT INTO emojis (emoji_id, name, guild_id, animated) VALUES ($1, $2, $3, $4) ON CONFLICT (emoji_id) DO NOTHING;",
-		model.Emoji.ID, model.Emoji.Name, guildID, model.Emoji.Animated); err != nil {
-		return err
-	}
+	fields := utils.GetKeysFromMap(valuesMap)
 
-	return nil
+	values := utils.GetValuesFromMapBasedOnKeys(valuesMap, fields)
+
+	query := fmt.Sprintf(`
+		INSERT INTO emojis (%s)
+		VALUES (%s)
+		ON CONFLICT (emoji_id) DO NOTHING;
+	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
+
+	_, err := db.Exec(query, values...)
+	return err
 }

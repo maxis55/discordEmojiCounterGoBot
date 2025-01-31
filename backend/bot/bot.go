@@ -119,7 +119,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	return
 }
 
-func messageUpdated(discord *discordgo.Session, message *discordgo.MessageUpdate) {
+func messageUpdated(_ *discordgo.Session, message *discordgo.MessageUpdate) {
 	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, dbv, true)
 
 	NotifyAboutErrorViaWebhook(err)
