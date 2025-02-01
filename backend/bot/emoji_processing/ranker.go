@@ -1,4 +1,4 @@
-package bot
+package emoji_processing
 
 import (
 	"database/sql"
@@ -19,7 +19,7 @@ type RankedEmoji struct {
 const maxEmbedFieldValueLen = 1024
 const maxEmbedTitleLen = 256
 
-func getRankedUsedEmojisInGuild(db *sql.DB, gid string, rs RankingSettings) (RankedEmojis, error) {
+func GetRankedUsedEmojisInGuild(db *sql.DB, gid string, rs RankingSettings) (RankedEmojis, error) {
 	var params []interface{}
 	var queryBuilder strings.Builder
 

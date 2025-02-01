@@ -1,4 +1,4 @@
-package bot
+package emoji_processing
 
 import (
 	"database/sql"
@@ -14,7 +14,7 @@ type ChannelModel struct {
 	Channel *discordgo.Channel
 }
 
-func queryAllGuildChannels(db *sql.DB, gid string) ([]ChannelModel, error) {
+func QueryAllGuildChannels(db *sql.DB, gid string) ([]ChannelModel, error) {
 	rows, err := db.Query("SELECT channel_id, name FROM channels where guild_id=$1", gid)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func queryAllGuildChannels(db *sql.DB, gid string) ([]ChannelModel, error) {
 	return channels, nil
 }
 
-func queryChannelById(db *sql.DB, cid string) (*ChannelModel, error) {
+func QueryChannelById(db *sql.DB, cid string) (*ChannelModel, error) {
 	row := db.QueryRow("SELECT channel_id, name FROM channels where channel_id=$1 LIMIT 1", cid)
 
 	model := &ChannelModel{Channel: &discordgo.Channel{}}

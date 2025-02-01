@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"emoji-counter/bot/emoji_processing"
 	"emoji-counter/db"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -35,7 +36,7 @@ func Run() {
 	// open session
 	err = discord.Open()
 
-	NotifyAboutErrorViaWebhook(err)
+	emoji_processing.NotifyAboutErrorViaWebhook(err)
 
 	defer discord.Close() // close session, after function termination
 
@@ -65,14 +66,14 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 
 	case strings.HasPrefix(message.Content, "%%saveEverythingAboutThisGuild"):
 		discord.ChannelMessageSend(message.ChannelID, "Ok")
-		saveGuildInfo(discord, message.GuildID, db.Connection)
+		emoji_processing.SaveGuildInfo(discord, message.GuildID, db.Connection)
 		discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())
 
 	case strings.HasPrefix(message.Content, "%%danceInEveryChannel"):
-		dance(discord, message, "")
+		handleHistoricalForGuild(discord, message)
 
 	case strings.HasPrefix(message.Content, "%%danceHere"):
-		dance(discord, message, message.ChannelID)
+		handleHistoricalForChannel(discord, message)
 
 	case strings.HasPrefix(message.Content, "%%helpMeRankEmojis"):
 		discord.ChannelMessageSend(message.ChannelID, "This is an example, figure it out: %%rankUsedEmojisInGuild author=123 channel=123321 ignoreReactions=true belongToTheGuild=false ignoreMessageText=false fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
@@ -82,9 +83,9 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		rankingHandler(discord, message)
 	}
 
-	err := ProcessOneMessage(discord, MessageModel{Message: message.Message}, message.GuildID, db.Connection)
+	err := emoji_processing.ProcessOneMessage(discord, emoji_processing.MessageModel{Message: message.Message}, message.GuildID, db.Connection)
 
-	NotifyAboutErrorViaWebhook(err)
+	emoji_processing.NotifyAboutErrorViaWebhook(err)
 
 	return
 }

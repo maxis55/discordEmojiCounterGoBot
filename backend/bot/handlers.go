@@ -1,20 +1,15 @@
 package bot
 
 import (
-	"bytes"
+	"emoji-counter/bot/emoji_processing"
 	"emoji-counter/db"
-	"encoding/json"
-	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"log"
-	"net/http"
-	"os"
 )
 
 func messageUpdated(_ *discordgo.Session, message *discordgo.MessageUpdate) {
-	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, db.Connection)
+	err := emoji_processing.ProcessOneMessage(nil, emoji_processing.MessageModel{Message: message.Message}, message.GuildID, db.Connection)
 
-	NotifyAboutErrorViaWebhook(err)
+	emoji_processing.NotifyAboutErrorViaWebhook(err)
 }
 
 func newReaction(discord *discordgo.Session, messageReaction *discordgo.MessageReactionAdd) {
@@ -37,26 +32,26 @@ func processReaction(discord *discordgo.Session, messageReaction *discordgo.Mess
 
 	//We don't know if it's a reaction under the bot message or not, reactions under the bot messages are ignored
 	//so we need to re-fetch it
-	msg, err := discord.ChannelMessage(messageReaction.ChannelID, messageReaction.MessageID, requestConfig)
+	msg, err := discord.ChannelMessage(messageReaction.ChannelID, messageReaction.MessageID, emoji_processing.RequestConfig)
 	msg.GuildID = messageReaction.GuildID
 
 	if err != nil {
-		NotifyAboutErrorViaWebhook(err)
+		emoji_processing.NotifyAboutErrorViaWebhook(err)
 		return
 	}
 
-	err = ProcessOneMessage(discord, MessageModel{Message: msg}, messageReaction.GuildID, db.Connection)
+	err = emoji_processing.ProcessOneMessage(discord, emoji_processing.MessageModel{Message: msg}, messageReaction.GuildID, db.Connection)
 
-	NotifyAboutErrorViaWebhook(err)
+	emoji_processing.NotifyAboutErrorViaWebhook(err)
 }
 
 func rankingHandler(discord *discordgo.Session, message *discordgo.MessageCreate) {
-	s := ExtractSettings(message.Content)
+	s := emoji_processing.ExtractSettings(message.Content)
 
-	rankedEmojis, err := getRankedUsedEmojisInGuild(db.Connection, message.GuildID, s)
+	rankedEmojis, err := emoji_processing.GetRankedUsedEmojisInGuild(db.Connection, message.GuildID, s)
 
 	if err != nil {
-		NotifyAboutErrorViaWebhook(err)
+		emoji_processing.NotifyAboutErrorViaWebhook(err)
 		return
 	}
 
@@ -65,38 +60,35 @@ func rankingHandler(discord *discordgo.Session, message *discordgo.MessageCreate
 	for _, embed := range embeds {
 		_, err = discord.ChannelMessageSendEmbed(message.ChannelID, &embed)
 
-		NotifyAboutErrorViaWebhook(err)
+		emoji_processing.NotifyAboutErrorViaWebhook(err)
 	}
 }
 
-func NotifyAboutErrorViaWebhook(botErr error) {
-	if botErr == nil {
-		return
-	}
-
-	type DiscordWebhookMessage struct {
-		Content string `json:"content"`
-	}
-
-	payload := DiscordWebhookMessage{
-		Content: fmt.Sprintf("<@%s> 💀 Reason: %s", os.Getenv("BOT_MASTER_ID"), botErr.Error()),
-	}
-
-	jsonPayload, err := json.Marshal(payload)
+func handleHistoricalForGuild(d *discordgo.Session, message *discordgo.MessageCreate) {
+	channels, err := emoji_processing.QueryAllGuildChannels(db.Connection, message.GuildID)
 	if err != nil {
-		log.Println(fmt.Sprintf("Failed to marshal payload: %v", err))
+		d.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), emoji_processing.RequestConfig)
 		return
 	}
 
-	resp, err := http.Post(os.Getenv("DISCORD_WEBHOOK_URL"), "application/json", bytes.NewBuffer(jsonPayload))
+	emoji_processing.Dance(d, message, channels)
+}
+
+func handleHistoricalForChannel(d *discordgo.Session, message *discordgo.MessageCreate) {
+	var channels []emoji_processing.ChannelModel
+	channel, err := emoji_processing.QueryChannelById(db.Connection, message.ChannelID)
+
 	if err != nil {
-		log.Println(fmt.Sprintf("Failed to send webhook: %v", err))
+		d.ChannelMessageSendReply(message.ChannelID, "💀 Reason: "+err.Error(), message.Reference(), emoji_processing.RequestConfig)
 		return
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNoContent {
-		log.Println(fmt.Sprintf("Unexpected response from Discord: %s", resp.Status))
+	if channel == nil {
+		d.ChannelMessageSendReply(message.ChannelID, "Cant find the channel in the DB. Save this guild first maybe", message.Reference(), emoji_processing.RequestConfig)
 		return
 	}
+
+	channels = append(channels, *channel)
+
+	emoji_processing.Dance(d, message, channels)
 }

@@ -1,4 +1,4 @@
-package bot
+package emoji_processing
 
 import (
 	"database/sql"
@@ -12,7 +12,7 @@ type GuildModel struct {
 	Guild *discordgo.Guild
 }
 
-func saveGuildInfo(discord *discordgo.Session, gid string, db *sql.DB) {
+func SaveGuildInfo(discord *discordgo.Session, gid string, db *sql.DB) {
 	guild, err := discord.Guild(gid)
 	if err != nil {
 		fmt.Println(err.Error())

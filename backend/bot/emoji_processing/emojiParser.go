@@ -1,4 +1,4 @@
-package bot
+package emoji_processing
 
 import (
 	"database/sql"
@@ -71,7 +71,7 @@ func (mm *MessageModel) getReactionEmojis(discord *discordgo.Session) ([]EmojiMo
 
 	if len(mm.Message.Reactions) > 0 {
 		for _, reaction := range mm.Message.Reactions {
-			users, err := discord.MessageReactions(mm.Message.ChannelID, mm.Message.ID, reaction.Emoji.APIName(), 100, "", "", requestConfig)
+			users, err := discord.MessageReactions(mm.Message.ChannelID, mm.Message.ID, reaction.Emoji.APIName(), 100, "", "", RequestConfig)
 
 			if err != nil {
 				return nil, err

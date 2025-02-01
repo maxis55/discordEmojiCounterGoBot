@@ -1,4 +1,4 @@
-package bot
+package emoji_processing
 
 import (
 	"encoding/json"
