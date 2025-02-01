@@ -19,6 +19,7 @@ services:
       - db-password
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./migration.sql:/docker-entrypoint-initdb.d/migration.sql
     environment:
       - POSTGRES_DB=emoji_tracker
       - POSTGRES_USER=${POSTGRES_USER}
