@@ -2,7 +2,7 @@ package bot
 
 import (
 	"bytes"
-	"discordEmojiCounterBot/db"
+	"emoji-counter/db"
 	"encoding/json"
 	"fmt"
 	"github.com/bwmarrin/discordgo"

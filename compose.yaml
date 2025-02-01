@@ -8,6 +8,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   db:
     image: postgres:16-alpine
@@ -22,7 +24,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
     expose:
-      - 5433
+      - 5432
     ports:
       - 5433:5432
     healthcheck:
@@ -30,6 +32,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:7.4.2-alpine
+    restart: always
+    expose:
+      - 6379
+    volumes:
+      - redis-data:/data
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_PORT=6379
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+
 
 #  proxy:
 #    image: nginx
@@ -45,6 +62,7 @@ services:
 
 volumes:
   db-data:
+  redis-data:
 
 secrets:
   db-password:

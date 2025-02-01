@@ -1,8 +1,9 @@
 package main
 
 import (
-	"discordEmojiCounterBot/bot"
-	"discordEmojiCounterBot/db"
+	"emoji-counter/bot"
+	"emoji-counter/cache"
+	"emoji-counter/db"
 	"fmt"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -15,8 +16,12 @@ func main() {
 		log.Fatal(fmt.Sprintf("Error loading .env file because '%s'", err.Error()))
 	}
 
-	dbcon, _ := db.Connect()
-	defer dbcon.Close()
+	db.Connect()
+	defer db.Close()
+
+	cache.Connect()
+	defer cache.Close()
+
 	bot.Run()
 
 	log.Println("Shutting down")

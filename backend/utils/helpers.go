@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -99,4 +100,12 @@ func GetValuesFromMapBasedOnKeys[T comparable](m map[T]any, keys []T) []any {
 	}
 
 	return values
+}
+
+func GetEnvStrWithFallback(envKey string, fallback string) string {
+	if v := os.Getenv(envKey); v != "" {
+		return v
+	}
+
+	return fallback
 }

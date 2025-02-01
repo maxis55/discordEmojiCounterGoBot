@@ -2,7 +2,7 @@ package bot
 
 import (
 	"database/sql"
-	"discordEmojiCounterBot/utils"
+	"emoji-counter/utils"
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
