@@ -38,7 +38,8 @@ func (em *EmojiModel) remember(db *sql.DB) error {
 	query := fmt.Sprintf(`
 		INSERT INTO emojis (%s)
 		VALUES (%s)
-		ON CONFLICT (emoji_id) DO NOTHING;
+		ON CONFLICT (emoji_id) DO UPDATE
+		SET name=EXCLUDED.name;
 	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
 	_, err := db.Exec(query, values...)

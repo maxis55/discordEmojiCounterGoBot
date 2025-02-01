@@ -166,6 +166,10 @@ func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discord
 }
 
 func (re *RankedEmoji) getEmbedContent() string {
+	//actually there's no need to format the same way discord does
+	//you can write whatever instead of the name, and, as long as ID is correct
+	//discord will display it correctly
+	//might be a point of improvement to condense the data more in embeds to shave off up to 31 symbols per emoji
 	return fmt.Sprintf("**%d**. %s - %d", re.Rank, re.Emoji.MessageFormat(), re.Count)
 }
 
