@@ -118,6 +118,7 @@ func GetRankedUsedEmojisInGuild(db *sql.DB, gid string, rs RankingSettings) (Ran
 //by sending max 1024*5, there's room to spare for settings(in title, 256 symbols), etc
 //send *columns* fields in each embed message, this way there's always room to spare
 //before sending - redistribute between 6 fields to make messages more event
+//max emoji len is 32 symbols, so there's no edge cases with some slices in the middle being overwhelmed on redistribution
 
 func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discordgo.MessageEmbed {
 	if len(*res) == 0 {
@@ -135,7 +136,8 @@ func (res *RankedEmojis) TransformIntoDiscordEmbeds(settingsJS string) []discord
 	chunkedRankedEmojis := utils.ChunkSlice(slicedRankedEmojis, maxColumnsBasedOnChars)
 
 	for _, chunk := range chunkedRankedEmojis {
-		redistributedSlices := utils.RedistributeSlicesIntoAmount(chunk, redistributedColumnsCount)
+		redistributedSlices := utils.RedistributeSlicesIntoAmountBasedOnEntries(chunk, redistributedColumnsCount)
+		redistributedSlices = utils.RedistributeSlicesBasedOnMaxLen(redistributedSlices, maxEmbedFieldValueLen)
 
 		for columnIndex, column := range redistributedSlices {
 			if columnIndex%redistributedColumnsCount == 0 {

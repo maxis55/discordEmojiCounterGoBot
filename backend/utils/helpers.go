@@ -40,9 +40,57 @@ func ChunkSlice[T any](items []T, chunkSize int) (chunks [][]T) {
 	return append(chunks, items)
 }
 
-func RedistributeSlicesIntoAmount(chunk [][]string, newSize int) [][]string {
+func RedistributeSlicesIntoAmountBasedOnEntries(initial [][]string, newSize int) [][]string {
+	var allStrings []string
+	for _, slice := range initial {
+		allStrings = append(allStrings, slice...)
+	}
+
+	totalLength := len(allStrings)
+
+	baseSize := totalLength / newSize
+	columnWithExtra := totalLength % newSize
+
+	newSlices := make([][]string, newSize)
+
+	index := 0
+	for i := 0; i < newSize; i++ {
+		limit := baseSize
+		if i < columnWithExtra {
+			limit++
+		}
+
+		newSlices[i] = allStrings[index : index+limit]
+		index += limit
+	}
+
+	return newSlices
+}
+
+func RedistributeSlicesBasedOnMaxLen(initial [][]string, maxLength int) [][]string {
+	// skip the last slice to avoid overflow
+	for i := 0; i < len(initial)-1; i++ {
+		currentLen := 0
+		for _, str := range initial[i] {
+			currentLen += len(str)
+		}
+
+		for currentLen > maxLength {
+			lastEntryIndex := len(initial[i]) - 1
+			lastEntry := initial[i][lastEntryIndex]
+			initial[i] = initial[i][:lastEntryIndex]
+			initial[i+1] = append([]string{lastEntry}, initial[i+1]...)
+
+			currentLen -= len(lastEntry)
+		}
+	}
+
+	return initial
+}
+
+func RedistributeSlicesIntoAmountBasedOnLength(initial [][]string, newSize int) [][]string {
 	totalLength := 0
-	for _, slice := range chunk {
+	for _, slice := range initial {
 		for _, str := range slice {
 			totalLength += len(str)
 		}
@@ -54,7 +102,7 @@ func RedistributeSlicesIntoAmount(chunk [][]string, newSize int) [][]string {
 	currentSlice := 0
 	currentLength := 0
 	firstSliceFilled := false
-	for _, slice := range chunk {
+	for _, slice := range initial {
 		for _, str := range slice {
 			if currentLength+len(str) > idealLength && currentSlice < newSize-1 && firstSliceFilled {
 				currentSlice++
