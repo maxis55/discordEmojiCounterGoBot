@@ -82,7 +82,7 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		rankingHandler(discord, message)
 	}
 
-	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, db.Connection, true)
+	err := ProcessOneMessage(discord, MessageModel{Message: message.Message}, message.GuildID, db.Connection)
 
 	NotifyAboutErrorViaWebhook(err)
 

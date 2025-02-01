@@ -26,7 +26,7 @@ services:
     expose:
       - 5432
     ports:
-      - 5433:5432
+      - "5433:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
       interval: 10s
@@ -38,6 +38,8 @@ services:
     restart: always
     expose:
       - 6379
+    ports:
+      - "6379:6379"
     volumes:
       - redis-data:/data
     environment:
@@ -47,18 +49,6 @@ services:
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
 
-
-#  proxy:
-#    image: nginx
-#    volumes:
-#      - type: bind
-#        source: ./proxy/nginx.conf
-#        target: /etc/nginx/conf.d/default.conf
-#        read_only: true
-#    ports:
-#      - 80:80
-#    depends_on:
-#      - backend
 
 volumes:
   db-data:

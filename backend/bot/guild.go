@@ -71,7 +71,8 @@ func (model *GuildModel) remember(db *sql.DB) error {
 	query := fmt.Sprintf(`
 		INSERT INTO guilds (%s)
 		VALUES (%s)
-		ON CONFLICT (guild_id) DO NOTHING;
+		ON CONFLICT (guild_id) DO UPDATE
+		SET name=EXCLUDED.name, region=EXCLUDED.region, member_count=EXCLUDED.member_count, icon=EXCLUDED.icon, owner_id=EXCLUDED.owner_id;
 	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
 	_, err := db.Exec(query, values...)

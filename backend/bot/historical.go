@@ -39,46 +39,32 @@ func requestConfig(cfg *discordgo.RequestConfig) {
 	cfg.MaxRestRetries = 15
 }
 
-func getAndSaveAllMessages(discord *discordgo.Session, beforeMessage *discordgo.Message, gid string, db *sql.DB, authors map[string]AuthorModel, waiter *discordgo.MessageReference, channel *discordgo.Channel) {
-	ms, err := discord.ChannelMessages(channel.ID, messagesPerPage, beforeMessage.ID, "", "", func(cfg *discordgo.RequestConfig) {
-		cfg.ShouldRetryOnRateLimit = true
-		cfg.MaxRestRetries = 15
-	})
+func getAndSaveAllMessages(discord *discordgo.Session, beforeMessage *discordgo.Message, gid string, db *sql.DB, waiter *discordgo.MessageReference, c *discordgo.Channel) {
+	ms, err := discord.ChannelMessages(c.ID, messagesPerPage, beforeMessage.ID, "", "", requestConfig)
 
 	if err != nil {
 		errMsg := err.Error()
-		_, err = discord.ChannelMessageSendReply(waiter.ChannelID, "💀 Reason: "+errMsg+" channel "+channel.Name, waiter, requestConfig)
+		_, err = discord.ChannelMessageSendReply(waiter.ChannelID, "💀 Reason: "+errMsg+" channel "+c.Name, waiter, requestConfig)
 
 		fmt.Println(errMsg)
 		return
 	}
 
 	for _, message := range ms {
-		if _, ok := authors[message.Author.ID]; !ok {
-			authors[message.Author.ID] = AuthorModel{Author: message.Author}
-		}
-
 		mm := MessageModel{Message: message}
 
-		err = ProcessOneMessage(discord, mm, gid, db, false)
+		err = ProcessOneMessage(discord, mm, gid, db)
 		if err != nil {
 			errMsg := err.Error()
-			_, err = discord.ChannelMessageSendReply(waiter.ChannelID, "💀 Reason: "+errMsg+" channel "+channel.Name, waiter, requestConfig)
+			_, err = discord.ChannelMessageSendReply(waiter.ChannelID, "💀 Reason: "+errMsg+" channel "+c.Name, waiter, requestConfig)
 
 			fmt.Println(errMsg)
 			return
 		}
 	}
 
-	if len(authors) > 20 {
-		saveAuthors(authors, db)
-		clear(authors)
-	}
-
 	if len(ms) < messagesPerPage {
-		saveAuthors(authors, db)
-
-		_, err = discord.ChannelMessageSendReply(waiter.ChannelID, fmt.Sprintf("Finished parsing channel '%s'", channel.Name), waiter, requestConfig)
+		_, err = discord.ChannelMessageSendReply(waiter.ChannelID, fmt.Sprintf("Finished parsing channel '%s'", c.Name), waiter, requestConfig)
 
 		if err != nil {
 			NotifyAboutErrorViaWebhook(err)
@@ -86,17 +72,7 @@ func getAndSaveAllMessages(discord *discordgo.Session, beforeMessage *discordgo.
 		return
 	}
 
-	getAndSaveAllMessages(discord, ms[len(ms)-1], gid, db, authors, waiter, channel)
-
-}
-
-func saveAuthors(authors map[string]AuthorModel, db *sql.DB) {
-	for _, author := range authors {
-		err := author.remember(db)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-	}
+	getAndSaveAllMessages(discord, ms[len(ms)-1], gid, db, waiter, c)
 }
 
 func dance(discord *discordgo.Session, message *discordgo.MessageCreate, channelID string) {
@@ -135,7 +111,7 @@ func dance(discord *discordgo.Session, message *discordgo.MessageCreate, channel
 		wg.Add(1)
 		go func(ch ChannelModel) {
 			defer wg.Done()
-			getAndSaveAllMessages(discord, message.Message, message.GuildID, db.Connection, make(map[string]AuthorModel), message.Reference(), ch.Channel)
+			getAndSaveAllMessages(discord, message.Message, message.GuildID, db.Connection, message.Reference(), ch.Channel)
 		}(channel)
 	}
 	for wg.GetCount() > 0 {

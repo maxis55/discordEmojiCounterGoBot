@@ -12,7 +12,7 @@ import (
 )
 
 func messageUpdated(_ *discordgo.Session, message *discordgo.MessageUpdate) {
-	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, db.Connection, true)
+	err := ProcessOneMessage(nil, MessageModel{Message: message.Message}, message.GuildID, db.Connection)
 
 	NotifyAboutErrorViaWebhook(err)
 }
@@ -45,7 +45,7 @@ func processReaction(discord *discordgo.Session, messageReaction *discordgo.Mess
 		return
 	}
 
-	err = ProcessOneMessage(discord, MessageModel{Message: msg}, messageReaction.GuildID, db.Connection, true)
+	err = ProcessOneMessage(discord, MessageModel{Message: msg}, messageReaction.GuildID, db.Connection)
 
 	NotifyAboutErrorViaWebhook(err)
 }

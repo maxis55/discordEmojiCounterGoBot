@@ -3,7 +3,6 @@ package bot
 import (
 	"database/sql"
 	"emoji-counter/utils"
-	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"strings"
@@ -11,77 +10,6 @@ import (
 
 type MessageModel struct {
 	Message *discordgo.Message
-}
-
-type AuthorModel struct {
-	Author *discordgo.User
-}
-
-type ChannelModel struct {
-	Channel *discordgo.Channel
-}
-
-func queryAllGuildChannels(db *sql.DB, gid string) ([]ChannelModel, error) {
-	rows, err := db.Query("SELECT channel_id, name FROM channels where guild_id=$1", gid)
-	if err != nil {
-		return nil, err
-	}
-
-	var channels []ChannelModel
-
-	for rows.Next() {
-		model := ChannelModel{Channel: &discordgo.Channel{}}
-		err = rows.Scan(&model.Channel.ID, &model.Channel.Name)
-		if err != nil {
-			return nil, err
-		}
-		channels = append(channels, model)
-	}
-
-	return channels, nil
-}
-
-func queryChannelById(db *sql.DB, cid string) (*ChannelModel, error) {
-	row := db.QueryRow("SELECT channel_id, name FROM channels where channel_id=$1 LIMIT 1", cid)
-
-	model := &ChannelModel{Channel: &discordgo.Channel{}}
-
-	err := row.Scan(&model.Channel.ID, &model.Channel.Name)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return model, nil
-}
-
-func (cm *ChannelModel) remember(db *sql.DB) error {
-	valuesMap := map[string]any{
-		"channel_id":     cm.Channel.ID,
-		"owner_id":       cm.Channel.OwnerID,
-		"name":           cm.Channel.Name,
-		"type":           cm.Channel.Type,
-		"application_id": cm.Channel.ApplicationID,
-		"parent_id":      cm.Channel.ParentID,
-		"guild_id":       cm.Channel.GuildID,
-		"nsfw":           cm.Channel.NSFW,
-		"position":       cm.Channel.Position,
-	}
-
-	fields := utils.GetKeysFromMap(valuesMap)
-	values := utils.GetValuesFromMapBasedOnKeys(valuesMap, fields)
-
-	query := fmt.Sprintf(`
-		INSERT INTO channels (%s)
-		VALUES (%s)
-		ON CONFLICT (channel_id) DO NOTHING;
-	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
-
-	_, err := db.Exec(query, values...)
-
-	return err
 }
 
 func (mm *MessageModel) remember(gid string, db *sql.DB) error {
@@ -135,30 +63,6 @@ func (mm *MessageModel) saveEmojiUsages(db *sql.DB, emojiModels []EmojiModel, gi
 		}
 	}
 	return nil
-}
-
-func (model AuthorModel) remember(db *sql.DB) error {
-	valuesMap := map[string]any{
-		"author_id":   model.Author.ID,
-		"verified":    model.Author.Verified,
-		"username":    model.Author.Username,
-		"global_name": model.Author.GlobalName,
-		"bot":         model.Author.Bot,
-		"system":      model.Author.System,
-		"mfa_enabled": model.Author.MFAEnabled,
-	}
-
-	fields := utils.GetKeysFromMap(valuesMap)
-	values := utils.GetValuesFromMapBasedOnKeys(valuesMap, fields)
-
-	query := fmt.Sprintf(`
-		INSERT INTO authors (%s)
-		VALUES (%s)
-		ON CONFLICT (author_id) DO NOTHING;
-	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
-
-	_, err := db.Exec(query, values...)
-	return err
 }
 
 func cleanInfoAboutMessage(mid string, db *sql.DB) error {

@@ -5,7 +5,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid string, db *sql.DB, rememberAuthor bool) error {
+func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid string, db *sql.DB) error {
 	if message.Message.Author.Bot {
 		return nil
 	}
@@ -37,11 +37,9 @@ func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid str
 		return err
 	}
 
-	if rememberAuthor {
-		err = AuthorModel{Author: message.Message.Author}.remember(db)
-		if err != nil {
-			return err
-		}
+	err = AuthorModel{Author: message.Message.Author}.remember(db)
+	if err != nil {
+		return err
 	}
 
 	return nil
