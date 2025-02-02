@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"emoji-counter/bot/easter"
 	"emoji-counter/bot/emoji_processing"
 	"emoji-counter/db"
 	"fmt"
@@ -85,6 +86,10 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 		err := emoji_processing.ProcessOneMessage(discord, emoji_processing.MessageModel{Message: message.Message}, message.GuildID, db.Connection)
 
 		emoji_processing.NotifyAboutErrorViaWebhook(err)
+	}()
+
+	go func() {
+		easter.ProcessEasterEgg(discord, message)
 	}()
 
 	return
