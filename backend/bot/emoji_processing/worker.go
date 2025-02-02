@@ -22,7 +22,7 @@ func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid str
 	//save to DB
 	rememberNewEmojis(ejs, db)
 
-	err = cleanEmojiInfoAboutMessage(message.Message.ID, db)
+	err = forgetUsedEmojisRelatedToMessage(message.Message.ID, db)
 	if err != nil {
 		return err
 	}
@@ -45,19 +45,19 @@ func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid str
 	return nil
 }
 
-func CleanInfoAboutMessage(mid string, db *sql.DB) error {
+func ForgetEverythingAboutMessage(mid string, db *sql.DB) error {
 	if _, err := db.Exec("DELETE FROM messages WHERE message_id=$1;", mid); err != nil {
 		return err
 	}
 
-	if err := cleanEmojiInfoAboutMessage(mid, db); err != nil {
+	if err := forgetUsedEmojisRelatedToMessage(mid, db); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func cleanEmojiInfoAboutMessage(mid string, db *sql.DB) error {
+func forgetUsedEmojisRelatedToMessage(mid string, db *sql.DB) error {
 	if _, err := db.Exec("DELETE FROM emoji_used where message_id=$1;", mid); err != nil {
 		return err
 	}

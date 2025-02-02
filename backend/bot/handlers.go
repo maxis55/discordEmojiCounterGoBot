@@ -13,7 +13,7 @@ func messageUpdated(_ *discordgo.Session, message *discordgo.MessageUpdate) {
 }
 
 func messageDeleted(_ *discordgo.Session, message *discordgo.MessageDelete) {
-	err := emoji_processing.CleanInfoAboutMessage(message.ID, db.Connection)
+	err := emoji_processing.ForgetEverythingAboutMessage(message.ID, db.Connection)
 
 	emoji_processing.NotifyAboutErrorViaWebhook(err)
 }
