@@ -157,3 +157,11 @@ func GetEnvStrWithFallback(envKey string, fallback string) string {
 
 	return fallback
 }
+
+func GetEnvBoolWithFallback(envKey string, fallback bool) bool {
+	if v := os.Getenv(envKey); v != "" {
+		return v == "true"
+	}
+
+	return fallback
+}

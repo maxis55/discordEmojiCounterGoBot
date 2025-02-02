@@ -29,6 +29,7 @@ func Run() {
 	// add a event handler
 	discord.AddHandler(newMessage)
 	discord.AddHandler(messageUpdated)
+	discord.AddHandler(messageDeleted)
 	discord.AddHandler(newReaction)
 	discord.AddHandler(removedReaction)
 	discord.AddHandler(removedAllReactions)

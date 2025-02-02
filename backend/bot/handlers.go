@@ -12,6 +12,12 @@ func messageUpdated(_ *discordgo.Session, message *discordgo.MessageUpdate) {
 	emoji_processing.NotifyAboutErrorViaWebhook(err)
 }
 
+func messageDeleted(_ *discordgo.Session, message *discordgo.MessageDelete) {
+	err := emoji_processing.CleanInfoAboutMessage(message.ID, db.Connection)
+
+	emoji_processing.NotifyAboutErrorViaWebhook(err)
+}
+
 func newReaction(discord *discordgo.Session, messageReaction *discordgo.MessageReactionAdd) {
 	processReaction(discord, messageReaction.MessageReaction)
 }
