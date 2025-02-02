@@ -3,8 +3,8 @@ services:
     build:
       context: backend
       target: app
-    secrets:
-      - db-password
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
@@ -46,10 +46,9 @@ services:
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_PORT=6379
-    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
-
 
 volumes:
   db-data:

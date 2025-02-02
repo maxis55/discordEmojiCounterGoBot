@@ -10,7 +10,7 @@ RUN go build -o ./bin .
 
 FROM alpine:3.20.3 AS app
 COPY --from=builder /build/bin /app/
-COPY --from=builder /build/.env /app/.env
+#COPY --from=builder /build/.env /app/.env
 
 WORKDIR /app
 

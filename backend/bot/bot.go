@@ -21,7 +21,6 @@ const pr = "%%"
 const rankUsedEmojisInGuild = pr + "rankUsedEmojisInGuild"
 
 func Run() {
-
 	// create a session
 	discord, err := discordgo.New("Bot " + os.Getenv("DISCORD_KEY"))
 	checkNilErr(err)
@@ -60,32 +59,33 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	// respond to user message if it contains `!help` or `!bye`
 	switch {
 	case strings.HasPrefix(message.Content, "%%hello"):
-		discord.ChannelMessageSend(message.ChannelID, "Hello World😃")
+		go discord.ChannelMessageSend(message.ChannelID, "Hello World😃")
 	case strings.HasPrefix(message.Content, "%%bye"):
-		discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
-
+		go discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
 	case strings.HasPrefix(message.Content, "%%saveEverythingAboutThisGuild"):
-		discord.ChannelMessageSend(message.ChannelID, "Ok")
-		emoji_processing.SaveGuildInfo(discord, message.GuildID, db.Connection)
-		discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())
+		go func() {
+			discord.ChannelMessageSend(message.ChannelID, "Ok")
+			emoji_processing.SaveGuildInfo(discord, message.GuildID, db.Connection)
+			discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())
+		}()
 
 	case strings.HasPrefix(message.Content, "%%danceInEveryChannel"):
-		handleHistoricalForGuild(discord, message)
-
+		go handleHistoricalForGuild(discord, message)
 	case strings.HasPrefix(message.Content, "%%danceHere"):
-		handleHistoricalForChannel(discord, message)
-
+		go handleHistoricalForChannel(discord, message)
 	case strings.HasPrefix(message.Content, "%%helpMeRankEmojis"):
-		discord.ChannelMessageSend(message.ChannelID, "This is an example, figure it out: %%rankUsedEmojisInGuild author=123 channel=123321 ignoreReactions=true belongToTheGuild=false ignoreMessageText=false fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
+		go discord.ChannelMessageSend(message.ChannelID, "This is an example, figure it out: %%rankUsedEmojisInGuild author=123 channel=123321 ignoreReactions=true belongToTheGuild=false ignoreMessageText=false fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
 	case strings.HasPrefix(message.Content, "%%helpMeRankReactions"):
-		discord.ChannelMessageSend(message.ChannelID, "This is a special case messageAuthor only works like this(dates are optional): %%rankUsedEmojisInGuild messageAuthor=123 ignoreMessageText=true fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
+		go discord.ChannelMessageSend(message.ChannelID, "This is a special case messageAuthor only works like this(dates are optional): %%rankUsedEmojisInGuild messageAuthor=123 ignoreMessageText=true fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
 	case strings.HasPrefix(message.Content, rankUsedEmojisInGuild):
-		rankingHandler(discord, message)
+		go rankingHandler(discord, message)
 	}
 
-	err := emoji_processing.ProcessOneMessage(discord, emoji_processing.MessageModel{Message: message.Message}, message.GuildID, db.Connection)
+	go func() {
+		err := emoji_processing.ProcessOneMessage(discord, emoji_processing.MessageModel{Message: message.Message}, message.GuildID, db.Connection)
 
-	emoji_processing.NotifyAboutErrorViaWebhook(err)
+		emoji_processing.NotifyAboutErrorViaWebhook(err)
+	}()
 
 	return
 }
