@@ -49,7 +49,7 @@ func (em *EmojiModel) forceRemember(db *sql.DB) error {
 		INSERT INTO emojis (%s)
 		VALUES (%s)
 		ON CONFLICT (emoji_id) DO UPDATE
-		SET name=EXCLUDED.name, guild_id=EXCLUDED.guild_id;
+		SET name=EXCLUDED.name, guild_id=COALESCE(EXCLUDED.guild_id, emojis.guild_id);
 	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
 	_, err := db.Exec(query, values...)
