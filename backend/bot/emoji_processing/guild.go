@@ -37,7 +37,7 @@ func SaveGuildInfo(discord *discordgo.Session, gid string, db *sql.DB) {
 
 	}
 
-	rememberNewEmojis(ejModels, db)
+	rememberGuildEmojis(ejModels, db)
 
 	channels, err := discord.GuildChannels(gid)
 	if err != nil {
@@ -77,4 +77,13 @@ func (model *GuildModel) remember(db *sql.DB) error {
 
 	_, err := db.Exec(query, values...)
 	return err
+}
+
+func rememberGuildEmojis(ejs []EmojiModel, db *sql.DB) {
+	for _, emoji := range ejs {
+		err := emoji.forceRemember(db)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}
 }

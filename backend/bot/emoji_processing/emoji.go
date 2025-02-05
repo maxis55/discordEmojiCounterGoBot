@@ -24,6 +24,16 @@ func (em *EmojiModel) remember(db *sql.DB) error {
 		return nil
 	}
 
+	err := em.forceRemember(db)
+
+	if err == nil {
+		cache.RememberKey(fmt.Sprintf(cache.EMOJI_KEY, em.Emoji.ID))
+	}
+
+	return err
+}
+
+func (em *EmojiModel) forceRemember(db *sql.DB) error {
 	valuesMap := map[string]any{
 		"emoji_id": em.Emoji.ID,
 		"name":     em.Emoji.Name,
@@ -39,14 +49,10 @@ func (em *EmojiModel) remember(db *sql.DB) error {
 		INSERT INTO emojis (%s)
 		VALUES (%s)
 		ON CONFLICT (emoji_id) DO UPDATE
-		SET name=EXCLUDED.name;
+		SET name=EXCLUDED.name, guild_id=EXCLUDED.guild_id;
 	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
 	_, err := db.Exec(query, values...)
-
-	if err == nil {
-		cache.RememberKey(fmt.Sprintf(cache.EMOJI_KEY, em.Emoji.ID))
-	}
 
 	return err
 }
