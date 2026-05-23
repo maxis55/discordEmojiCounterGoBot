@@ -11,7 +11,7 @@ services:
       target: app
     container_name: emoji-bot
     env_file:
-      - .env
+      - stack.env
     restart: unless-stopped
     depends_on:
       db:
