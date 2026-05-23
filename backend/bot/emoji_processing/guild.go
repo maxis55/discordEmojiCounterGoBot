@@ -6,6 +6,7 @@ import (
 	"emoji-counter/utils"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"log/slog"
 	"strings"
 )
 
@@ -16,13 +17,12 @@ type GuildModel struct {
 func SaveGuildInfo(discord *discordgo.Session, gid string, db *sql.DB) {
 	guild, err := discord.Guild(gid)
 	if err != nil {
-		fmt.Println(err.Error())
+		slog.Error("fetch guild failed", "guild", gid, "err", err)
+		return
 	}
 
-	err = (&GuildModel{Guild: guild}).remember(db)
-
-	if err != nil {
-		fmt.Println(err.Error())
+	if err := (&GuildModel{Guild: guild}).remember(db); err != nil {
+		slog.Error("save guild failed", "guild", gid, "err", err)
 	}
 
 	ejModels := make([]EmojiModel, 0, len(guild.Emojis))
@@ -35,23 +35,21 @@ func SaveGuildInfo(discord *discordgo.Session, gid string, db *sql.DB) {
 			Emoji:   *emoji,
 			GuildID: &gid,
 		})
-
 	}
 
 	rememberGuildEmojis(ejModels, db)
 
 	channels, err := discord.GuildChannels(gid)
 	if err != nil {
-		fmt.Println(err.Error())
+		slog.Error("fetch guild channels failed", "guild", gid, "err", err)
+		return
 	}
 
 	for _, channel := range channels {
-		err = (&ChannelModel{Channel: channel}).remember(db)
-		if err != nil {
-			fmt.Println(err.Error())
+		if err := (&ChannelModel{Channel: channel}).remember(db); err != nil {
+			slog.Error("save channel failed", "channel", channel.ID, "err", err)
 		}
 	}
-
 }
 
 func (model *GuildModel) remember(db *sql.DB) error {
@@ -82,9 +80,8 @@ func (model *GuildModel) remember(db *sql.DB) error {
 
 func rememberGuildEmojis(ejs []EmojiModel, db *sql.DB) {
 	for _, emoji := range ejs {
-		err := emoji.forceRemember(db)
-		if err != nil {
-			fmt.Println(err.Error())
+		if err := emoji.forceRemember(db); err != nil {
+			slog.Error("save emoji failed", "emoji", emoji.Emoji.ID, "err", err)
 		}
 	}
 }

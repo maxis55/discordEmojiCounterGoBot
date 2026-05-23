@@ -3,8 +3,8 @@ package emoji_processing
 import (
 	"database/sql"
 	"emoji-counter/utils"
-	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"log/slog"
 	"regexp"
 	"slices"
 )
@@ -127,9 +127,8 @@ func rememberNewEmojis(ejs []EmojiModel, db *sql.DB) {
 	}
 
 	for _, emoji := range uniqueEmojis {
-		err := emoji.remember(db)
-		if err != nil {
-			fmt.Println(err.Error())
+		if err := emoji.remember(db); err != nil {
+			slog.Error("save emoji failed", "emoji", emoji.Emoji.ID, "err", err)
 		}
 	}
 }

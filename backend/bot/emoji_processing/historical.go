@@ -5,6 +5,7 @@ import (
 	"emoji-counter/db"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"log/slog"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -43,10 +44,8 @@ func getAndSaveAllMessages(discord *discordgo.Session, beforeMessage *discordgo.
 	ms, err := discord.ChannelMessages(c.ID, messagesPerPage, beforeMessage.ID, "", "", RequestConfig)
 
 	if err != nil {
-		errMsg := err.Error()
-		_, err = discord.ChannelMessageSendReply(waiter.ChannelID, "💀 Reason: "+errMsg+" channel "+c.Name, waiter, RequestConfig)
-
-		fmt.Println(errMsg)
+		slog.Error("fetch channel messages failed", "channel", c.Name, "err", err)
+		_, _ = discord.ChannelMessageSendReply(waiter.ChannelID, "💀 Reason: "+err.Error()+" channel "+c.Name, waiter, RequestConfig)
 		return
 	}
 
@@ -55,10 +54,8 @@ func getAndSaveAllMessages(discord *discordgo.Session, beforeMessage *discordgo.
 
 		err = ProcessOneMessage(discord, mm, gid, db)
 		if err != nil {
-			errMsg := err.Error()
-			_, err = discord.ChannelMessageSendReply(waiter.ChannelID, "💀 Reason: "+errMsg+" channel "+c.Name, waiter, RequestConfig)
-
-			fmt.Println(errMsg)
+			slog.Error("process historical message failed", "channel", c.Name, "err", err)
+			_, _ = discord.ChannelMessageSendReply(waiter.ChannelID, "💀 Reason: "+err.Error()+" channel "+c.Name, waiter, RequestConfig)
 			return
 		}
 	}

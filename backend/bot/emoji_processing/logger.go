@@ -4,13 +4,21 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 )
 
 func NotifyAboutErrorViaWebhook(botErr error) {
 	if botErr == nil {
+		return
+	}
+
+	// Always log to stdout first so the error survives even if Discord/the webhook is down.
+	slog.Error("bot error", "err", botErr)
+
+	webhookURL := os.Getenv("DISCORD_WEBHOOK_URL")
+	if webhookURL == "" {
 		return
 	}
 
@@ -24,19 +32,18 @@ func NotifyAboutErrorViaWebhook(botErr error) {
 
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
-		log.Println(fmt.Sprintf("Failed to marshal payload: %v", err))
+		slog.Warn("webhook marshal failed", "err", err)
 		return
 	}
 
-	resp, err := http.Post(os.Getenv("DISCORD_WEBHOOK_URL"), "application/json", bytes.NewBuffer(jsonPayload))
+	resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
-		log.Println(fmt.Sprintf("Failed to send webhook: %v", err))
+		slog.Warn("webhook post failed", "err", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNoContent {
-		log.Println(fmt.Sprintf("Unexpected response from Discord: %s", resp.Status))
-		return
+		slog.Warn("webhook unexpected response", "status", resp.Status)
 	}
 }
