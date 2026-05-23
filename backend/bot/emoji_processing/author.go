@@ -14,7 +14,9 @@ type AuthorModel struct {
 	Author *discordgo.User
 }
 
-func (am AuthorModel) remember(db *sql.DB) error {
+// Remember upserts the author row, skipping the DB write when the cache says we
+// already saw this author recently.
+func (am AuthorModel) Remember(db *sql.DB) error {
 	if cache.KeyExists(fmt.Sprintf(cache.AUTHOR_KEY, am.Author.ID)) {
 		return nil
 	}
@@ -45,5 +47,20 @@ func (am AuthorModel) remember(db *sql.DB) error {
 		cache.RememberKey(fmt.Sprintf(cache.AUTHOR_KEY, am.Author.ID))
 	}
 
+	return err
+}
+
+// RememberAuthorByID inserts a minimal authors row for an author we don't have
+// full info for (e.g., a reactor on the remove-event path). Does not write to
+// the cache — we want a later Remember() call with full info to still run and
+// populate username/global_name.
+func RememberAuthorByID(authorID string, db *sql.DB) error {
+	if cache.KeyExists(fmt.Sprintf(cache.AUTHOR_KEY, authorID)) {
+		return nil
+	}
+	_, err := dbpkg.Exec(db,
+		`INSERT INTO authors (author_id) VALUES ($1) ON CONFLICT (author_id) DO NOTHING`,
+		authorID,
+	)
 	return err
 }

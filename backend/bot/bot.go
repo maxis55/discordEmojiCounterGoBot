@@ -28,6 +28,11 @@ func goAsync(fn func()) {
 	}()
 }
 
+// guildSaveInflight tracks guild IDs that have an in-progress SaveGuildInfo
+// goroutine, so a double-trigger of %%saveEverythingAboutThisGuild doesn't
+// kick off two simultaneous imports for the same guild.
+var guildSaveInflight sync.Map
+
 func Run(ctx context.Context) {
 	discord, err := discordgo.New("Bot " + os.Getenv("DISCORD_KEY"))
 	if err != nil {
@@ -41,6 +46,7 @@ func Run(ctx context.Context) {
 	discord.AddHandler(newReaction)
 	discord.AddHandler(removedReaction)
 	discord.AddHandler(removedAllReactions)
+	discord.AddHandler(rateLimited)
 
 	if err := discord.Open(); err != nil {
 		emoji_processing.NotifyAboutErrorViaWebhook(err)
@@ -67,7 +73,14 @@ func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
 	case strings.HasPrefix(message.Content, "%%bye"):
 		goAsync(func() { discord.ChannelMessageSend(message.ChannelID, "Good Bye👋") })
 	case strings.HasPrefix(message.Content, "%%saveEverythingAboutThisGuild"):
+		if _, loaded := guildSaveInflight.LoadOrStore(message.GuildID, struct{}{}); loaded {
+			goAsync(func() {
+				discord.ChannelMessageSend(message.ChannelID, "Already saving this guild, please wait")
+			})
+			break
+		}
 		goAsync(func() {
+			defer guildSaveInflight.Delete(message.GuildID)
 			discord.ChannelMessageSend(message.ChannelID, "Ok")
 			emoji_processing.SaveGuildInfo(discord, message.GuildID, db.Connection)
 			discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())

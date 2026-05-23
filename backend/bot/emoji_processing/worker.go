@@ -12,34 +12,27 @@ func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid str
 	}
 
 	ejs, err := message.GetEmojisFromMessage(discord)
-
 	if err != nil {
 		return err
 	}
 
-	//js, _ := json.Marshal(m)
-	//fmt.Println(string(js))
+	// Save parents before children so referential intent holds (no FKs today, but
+	// keeps the door open and makes the data shape less surprising).
+	if err := (AuthorModel{Author: message.Message.Author}).Remember(db); err != nil {
+		return err
+	}
 
-	//save to DB
 	rememberNewEmojis(ejs, db)
 
-	err = forgetUsedEmojisRelatedToMessage(message.Message.ID, db)
-	if err != nil {
+	if err := forgetUsedEmojisRelatedToMessage(message.Message.ID, db); err != nil {
 		return err
 	}
 
-	err = message.remember(gid, db)
-	if err != nil {
+	if err := message.remember(gid, db); err != nil {
 		return err
 	}
 
-	err = message.saveEmojiUsages(db, ejs, gid)
-	if err != nil {
-		return err
-	}
-
-	err = AuthorModel{Author: message.Message.Author}.remember(db)
-	if err != nil {
+	if err := message.saveEmojiUsages(db, ejs, gid); err != nil {
 		return err
 	}
 
