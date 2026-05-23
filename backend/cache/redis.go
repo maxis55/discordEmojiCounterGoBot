@@ -5,6 +5,7 @@ import (
 	"emoji-counter/utils"
 	"fmt"
 	"github.com/redis/go-redis/v9"
+	"log/slog"
 	"os"
 	"time"
 )
@@ -14,9 +15,15 @@ var Ctx = context.Background()
 
 func Connect() {
 	RedisCache = redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), utils.GetEnvStrWithFallback("REDIS_PORT", "6379")),
-		Password: os.Getenv("REDIS_PASSWORD"),
-		DB:       0,
+		Addr:            fmt.Sprintf("%s:%s", os.Getenv("REDIS_HOST"), utils.GetEnvStrWithFallback("REDIS_PORT", "6379")),
+		Password:        os.Getenv("REDIS_PASSWORD"),
+		DB:              0,
+		MaxRetries:      3,
+		MinRetryBackoff: 100 * time.Millisecond,
+		MaxRetryBackoff: 2 * time.Second,
+		DialTimeout:     5 * time.Second,
+		ReadTimeout:     3 * time.Second,
+		WriteTimeout:    3 * time.Second,
 	})
 
 	_, err := RedisCache.Ping(Ctx).Result()
@@ -44,6 +51,6 @@ func RememberKey(key string) {
 	err := RedisCache.Set(Ctx, key, "1", time.Hour).Err()
 
 	if err != nil {
-		fmt.Println(err.Error())
+		slog.Warn("redis set failed", "key", key, "err", err)
 	}
 }
