@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -130,17 +131,23 @@ func SQLPlaceholders(n int) string {
 	return strings.Join(parts, ", ")
 }
 
-func GetKeysFromMap[T comparable](m map[T]any) []T {
+// GetKeysFromMap returns the keys of m sorted alphabetically so that callers
+// building SQL strings from a map produce a deterministic column list. Random
+// map iteration would otherwise change the SQL text on every call and defeat
+// Postgres' prepared-statement cache.
+func GetKeysFromMap[T ~string](m map[T]any) []T {
 	keys := make([]T, 0, len(m))
 
 	for key := range m {
 		keys = append(keys, key)
 	}
 
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+
 	return keys
 }
 
-func GetValuesFromMapBasedOnKeys[T comparable](m map[T]any, keys []T) []any {
+func GetValuesFromMapBasedOnKeys[T ~string](m map[T]any, keys []T) []any {
 	values := make([]any, len(keys))
 
 	for i, key := range keys {
