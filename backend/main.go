@@ -19,6 +19,11 @@ func main() {
 	db.Connect()
 	defer db.Close()
 
+	if err := db.Migrate(db.Connection); err != nil {
+		slog.Error("migrate failed", "err", err)
+		os.Exit(1)
+	}
+
 	cache.Connect()
 	defer cache.Close()
 

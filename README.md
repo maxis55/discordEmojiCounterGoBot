@@ -35,3 +35,9 @@ To redeploy after a code change, hit **Pull and redeploy** in the Portainer stac
 | redis   | redis:7.4.2-alpine   | 100M LRU cache, password-protected.            |
 
 The backend Dockerfile is a multi-stage build that produces a minimal Alpine-based runtime image.
+
+## Database migrations
+
+SQL migrations live in `backend/db/migrations/` and are embedded into the binary at build time. On startup the bot creates a `schema_migrations` table and applies any migration not yet recorded, in numeric order, each inside its own transaction.
+
+To add a new migration, drop a file like `003_my_change.sql` into that directory and rebuild. Existing deployments pick it up on next start; fresh deployments get the whole chain.
