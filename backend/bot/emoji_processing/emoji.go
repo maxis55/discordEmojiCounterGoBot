@@ -3,6 +3,7 @@ package emoji_processing
 import (
 	"database/sql"
 	"emoji-counter/cache"
+	dbpkg "emoji-counter/db"
 	"emoji-counter/utils"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -52,7 +53,7 @@ func (em *EmojiModel) forceRemember(db *sql.DB) error {
 		SET name=EXCLUDED.name, guild_id=COALESCE(EXCLUDED.guild_id, emojis.guild_id);
 	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
-	_, err := db.Exec(query, values...)
+	_, err := dbpkg.Exec(db, query, values...)
 
 	return err
 }

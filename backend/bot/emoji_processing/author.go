@@ -3,6 +3,7 @@ package emoji_processing
 import (
 	"database/sql"
 	"emoji-counter/cache"
+	dbpkg "emoji-counter/db"
 	"emoji-counter/utils"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -38,7 +39,7 @@ func (am AuthorModel) remember(db *sql.DB) error {
 		SET username=EXCLUDED.username, global_name=EXCLUDED.global_name;
 	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
-	_, err := db.Exec(query, values...)
+	_, err := dbpkg.Exec(db, query, values...)
 
 	if err == nil {
 		cache.RememberKey(fmt.Sprintf(cache.AUTHOR_KEY, am.Author.ID))

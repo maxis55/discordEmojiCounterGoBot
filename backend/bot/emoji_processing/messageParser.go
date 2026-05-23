@@ -2,6 +2,7 @@ package emoji_processing
 
 import (
 	"database/sql"
+	dbpkg "emoji-counter/db"
 	"emoji-counter/utils"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -40,7 +41,7 @@ func (mm *MessageModel) remember(gid string, db *sql.DB) error {
 		SET content=EXCLUDED.content, edited_timestamp=EXCLUDED.edited_timestamp;
 	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
-	_, err := db.Exec(query, values...)
+	_, err := dbpkg.Exec(db, query, values...)
 	return err
 }
 
@@ -65,7 +66,7 @@ func (mm *MessageModel) saveEmojiUsages(db *sql.DB, emojiModels []EmojiModel, gi
 			VALUES (%s);
 		`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
-		if _, err := db.Exec(query, values...); err != nil {
+		if _, err := dbpkg.Exec(db, query, values...); err != nil {
 			return err
 		}
 	}

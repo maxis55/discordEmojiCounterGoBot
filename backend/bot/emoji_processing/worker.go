@@ -2,6 +2,7 @@ package emoji_processing
 
 import (
 	"database/sql"
+	dbpkg "emoji-counter/db"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -46,7 +47,7 @@ func ProcessOneMessage(discord *discordgo.Session, message MessageModel, gid str
 }
 
 func ForgetEverythingAboutMessage(mid string, db *sql.DB) error {
-	if _, err := db.Exec("DELETE FROM messages WHERE message_id=$1;", mid); err != nil {
+	if _, err := dbpkg.Exec(db, "DELETE FROM messages WHERE message_id=$1;", mid); err != nil {
 		return err
 	}
 
@@ -58,7 +59,7 @@ func ForgetEverythingAboutMessage(mid string, db *sql.DB) error {
 }
 
 func forgetUsedEmojisRelatedToMessage(mid string, db *sql.DB) error {
-	if _, err := db.Exec("DELETE FROM emoji_used where message_id=$1;", mid); err != nil {
+	if _, err := dbpkg.Exec(db, "DELETE FROM emoji_used where message_id=$1;", mid); err != nil {
 		return err
 	}
 	return nil

@@ -1,32 +1,40 @@
 package bot
 
 import (
+	"context"
 	"emoji-counter/bot/easter"
 	"emoji-counter/bot/emoji_processing"
 	"emoji-counter/db"
-	"fmt"
-	"github.com/bwmarrin/discordgo"
-	"log"
+	"log/slog"
 	"os"
-	"os/signal"
 	"strings"
-)
+	"sync"
 
-func checkNilErr(e error) {
-	if e != nil {
-		log.Fatal("Error message")
-	}
-}
+	"github.com/bwmarrin/discordgo"
+)
 
 const pr = "%%"
 const rankUsedEmojisInGuild = pr + "rankUsedEmojisInGuild"
 
-func Run() {
-	// create a session
-	discord, err := discordgo.New("Bot " + os.Getenv("DISCORD_KEY"))
-	checkNilErr(err)
+var wg sync.WaitGroup
 
-	// add a event handler
+// goAsync runs fn in a goroutine tracked by the package WaitGroup so that
+// Run() can drain in-flight handler work before shutdown.
+func goAsync(fn func()) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		fn()
+	}()
+}
+
+func Run(ctx context.Context) {
+	discord, err := discordgo.New("Bot " + os.Getenv("DISCORD_KEY"))
+	if err != nil {
+		slog.Error("discord session create failed", "err", err)
+		os.Exit(1)
+	}
+
 	discord.AddHandler(newMessage)
 	discord.AddHandler(messageUpdated)
 	discord.AddHandler(messageDeleted)
@@ -34,64 +42,58 @@ func Run() {
 	discord.AddHandler(removedReaction)
 	discord.AddHandler(removedAllReactions)
 
-	// open session
-	err = discord.Open()
+	if err := discord.Open(); err != nil {
+		emoji_processing.NotifyAboutErrorViaWebhook(err)
+		slog.Error("discord session open failed", "err", err)
+		os.Exit(1)
+	}
+	defer discord.Close()
 
-	emoji_processing.NotifyAboutErrorViaWebhook(err)
-
-	defer discord.Close() // close session, after function termination
-
-	// keep bot running until there is NO os interruption (ctrl + C)
-	fmt.Println("Bot running....")
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	<-c
+	slog.Info("bot running")
+	<-ctx.Done()
+	slog.Info("shutdown signal received, draining handlers")
+	wg.Wait()
+	slog.Info("handlers drained")
 }
 
 func newMessage(discord *discordgo.Session, message *discordgo.MessageCreate) {
-
-	/* prevent bot responding to its own message
-	this is achived by looking into the message author id
-	if message.author.id is same as bot.author.id then just return
-	*/
 	if message.Author.ID == discord.State.User.ID || message.Author.Bot {
 		return
 	}
 
-	// respond to user message if it contains `!help` or `!bye`
 	switch {
 	case strings.HasPrefix(message.Content, "%%hello"):
-		go discord.ChannelMessageSend(message.ChannelID, "Hello World😃")
+		goAsync(func() { discord.ChannelMessageSend(message.ChannelID, "Hello World😃") })
 	case strings.HasPrefix(message.Content, "%%bye"):
-		go discord.ChannelMessageSend(message.ChannelID, "Good Bye👋")
+		goAsync(func() { discord.ChannelMessageSend(message.ChannelID, "Good Bye👋") })
 	case strings.HasPrefix(message.Content, "%%saveEverythingAboutThisGuild"):
-		go func() {
+		goAsync(func() {
 			discord.ChannelMessageSend(message.ChannelID, "Ok")
 			emoji_processing.SaveGuildInfo(discord, message.GuildID, db.Connection)
 			discord.ChannelMessageSendReply(message.ChannelID, "Done", message.Reference())
-		}()
-
+		})
 	case strings.HasPrefix(message.Content, "%%danceInEveryChannel"):
-		go handleHistoricalForGuild(discord, message)
+		goAsync(func() { handleHistoricalForGuild(discord, message) })
 	case strings.HasPrefix(message.Content, "%%danceHere"):
-		go handleHistoricalForChannel(discord, message)
+		goAsync(func() { handleHistoricalForChannel(discord, message) })
 	case strings.HasPrefix(message.Content, "%%helpMeRankEmojis"):
-		go discord.ChannelMessageSend(message.ChannelID, "This is an example, figure it out: %%rankUsedEmojisInGuild author=123 channel=123321 ignoreReactions=true belongToTheGuild=false ignoreMessageText=false fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
+		goAsync(func() {
+			discord.ChannelMessageSend(message.ChannelID, "This is an example, figure it out: %%rankUsedEmojisInGuild author=123 channel=123321 ignoreReactions=true belongToTheGuild=false ignoreMessageText=false fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
+		})
 	case strings.HasPrefix(message.Content, "%%helpMeRankReactions"):
-		go discord.ChannelMessageSend(message.ChannelID, "This is a special case messageAuthor only works like this(dates are optional): %%rankUsedEmojisInGuild messageAuthor=123 ignoreMessageText=true fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
+		goAsync(func() {
+			discord.ChannelMessageSend(message.ChannelID, "This is a special case messageAuthor only works like this(dates are optional): %%rankUsedEmojisInGuild messageAuthor=123 ignoreMessageText=true fromDate=2022-01-01 toDate=2024-01-01 desc=true limit=10")
+		})
 	case strings.HasPrefix(message.Content, rankUsedEmojisInGuild):
-		go rankingHandler(discord, message)
+		goAsync(func() { rankingHandler(discord, message) })
 	}
 
-	go func() {
+	goAsync(func() {
 		err := emoji_processing.ProcessOneMessage(discord, emoji_processing.MessageModel{Message: message.Message}, message.GuildID, db.Connection)
-
 		emoji_processing.NotifyAboutErrorViaWebhook(err)
-	}()
+	})
 
-	go func() {
+	goAsync(func() {
 		easter.ProcessEasterEgg(discord, message)
-	}()
-
-	return
+	})
 }

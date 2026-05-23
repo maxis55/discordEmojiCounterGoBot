@@ -2,6 +2,7 @@ package emoji_processing
 
 import (
 	"database/sql"
+	dbpkg "emoji-counter/db"
 	"emoji-counter/utils"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -75,7 +76,7 @@ func (model *GuildModel) remember(db *sql.DB) error {
 		SET name=EXCLUDED.name, region=EXCLUDED.region, member_count=EXCLUDED.member_count, icon=EXCLUDED.icon, owner_id=EXCLUDED.owner_id;
 	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
-	_, err := db.Exec(query, values...)
+	_, err := dbpkg.Exec(db, query, values...)
 	return err
 }
 

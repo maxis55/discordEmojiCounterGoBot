@@ -3,6 +3,7 @@ package emoji_processing
 import (
 	"database/sql"
 	"emoji-counter/cache"
+	dbpkg "emoji-counter/db"
 	"emoji-counter/utils"
 	"errors"
 	"fmt"
@@ -77,7 +78,7 @@ func (cm *ChannelModel) remember(db *sql.DB) error {
 		SET name=EXCLUDED.name, position=EXCLUDED.position, nsfw=EXCLUDED.nsfw;
 	`, strings.Join(fields, ", "), utils.SQLPlaceholders(len(fields)))
 
-	_, err := db.Exec(query, values...)
+	_, err := dbpkg.Exec(db, query, values...)
 
 	if err == nil {
 		cache.RememberKey(fmt.Sprintf(cache.CHANNEL_KEY, cm.Channel.ID))

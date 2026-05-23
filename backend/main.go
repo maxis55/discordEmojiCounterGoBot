@@ -1,21 +1,31 @@
 package main
 
 import (
+	"context"
 	"emoji-counter/bot"
 	"emoji-counter/cache"
 	"emoji-counter/db"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+
 	_ "github.com/lib/pq"
-	"log"
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
 	db.Connect()
 	defer db.Close()
 
 	cache.Connect()
 	defer cache.Close()
 
-	bot.Run()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	log.Println("Shutting down")
+	bot.Run(ctx)
+
+	slog.Info("shutting down")
 }
