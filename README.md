@@ -1,38 +1,37 @@
-## Emoji Counter Bot for Discord 
-### Using Go and docker-compose
+# Emoji Counter Bot for Discord
 
+Go bot that counts emoji usage in a Discord server. Runs as three containers: the bot, Postgres, and Redis.
 
-[_Dockerfile_](backend/Dockerfile)
-Dockerfile contains an example of minifying the resulting container in Go by utilizing multi-step builder.
+## Local development
 
-## Deploy with docker compose (--build flag recreates if something is updated)
+1. Copy `.env.example` to `.env` and fill in the values (Discord token, passwords, etc).
+2. Bring it up:
+   ```shell
+   docker compose up -d --build
+   ```
+   `compose.override.yaml` is picked up automatically and republishes Postgres on `localhost:5433` and Redis on `localhost:6379` so you can connect with a GUI.
+3. Tear down:
+   ```shell
+   docker compose down
+   ```
 
-```shell
-$ docker compose up -d --build
-[+] Running 20/13
- ✔ redis Pulled                
- ✔ db Pulled 
-...
-=> naming to docker.io/library/discordemojicountergobot-backend
-[+] Running 4/4
- ✔ Network discordemojicountergobot_default      Created
- ✔ Container discordemojicountergobot-db-1       Healthy 
- ✔ Container discordemojicountergobot-redis-1    Healthy   
- ✔ Container discordemojicountergobot-backend-1  Started  
-```
+## Deploying via Portainer
 
-## Expected result
+The same `compose.yaml` works as a Portainer **stack**. The override file is ignored in production, so DB/Redis stay on the internal network only.
 
-Listing containers must show three containers running and the port mapping as below:
-```shell
-$ docker compose ps
-NAME                                 IMAGE                              COMMAND                  SERVICE   CREATED          STATUS                 PORTS
-discordemojicountergobot-backend-1   discordemojicountergobot-backend   "./bin"                  backend   19 minutes ago   Up 19 minutes
-discordemojicountergobot-db-1        postgres:16-alpine                 "docker-entrypoint.s…"   db        2 hours ago      Up 2 hours (healthy)   0.0.0.0:5433->5432/tcp
-discordemojicountergobot-redis-1     redis:7.4.2-alpine                 "docker-entrypoint.s…"   redis     2 hours ago      Up 2 hours (healthy)   0.0.0.0:6379->6379/tcp
-```
+1. In Portainer: **Stacks → Add stack → Repository**, point it at this repo.
+2. Set the compose path to `compose.yaml` (do **not** include `compose.override.yaml`).
+3. Add the environment variables from `.env.example` in the stack's *Environment variables* section.
+4. Deploy.
 
-Stop and remove the containers(and images)
-```shell
-$ docker-compose down --rmi all 
-```
+To redeploy after a code change, hit **Pull and redeploy** in the Portainer stack view.
+
+## Containers
+
+| Service | Image                | Notes                                          |
+|---------|----------------------|------------------------------------------------|
+| backend | built from `backend/`| The bot. Memory-capped at 256M.                |
+| db      | postgres:16-alpine   | Initial schema seeded from `migration.sql`.    |
+| redis   | redis:7.4.2-alpine   | 100M LRU cache, password-protected.            |
+
+The backend Dockerfile is a multi-stage build that produces a minimal Alpine-based runtime image.

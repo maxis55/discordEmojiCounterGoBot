@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   backend:
     build:
       context: backend
       target: app
+    container_name: emoji-bot
     env_file:
       - .env
     restart: unless-stopped
@@ -11,50 +18,62 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "pgrep", "-x", "bin"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *default-logging
 
   db:
     image: postgres:16-alpine
-    restart: always
+    container_name: emoji-bot-db
+    restart: unless-stopped
     user: postgres
-    secrets:
-      - db-password
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./migration.sql:/docker-entrypoint-initdb.d/migration.sql
     environment:
       - POSTGRES_DB=emoji_tracker
       - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     expose:
       - 5432
-    ports:
-      - "5433:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging: *default-logging
 
   redis:
     image: redis:7.4.2-alpine
-    restart: always
+    container_name: emoji-bot-redis
+    restart: unless-stopped
     expose:
       - 6379
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - REDIS_PORT=6379
     command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     healthcheck:
-      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging: *default-logging
 
 volumes:
   db-data:
   redis-data:
-
-secrets:
-  db-password:
-    file: db/password.txt
